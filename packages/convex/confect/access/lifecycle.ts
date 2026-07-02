@@ -417,15 +417,27 @@ export const cancelInvitation = (input: {
   };
 };
 
+/**
+ * A workspace membership is "live" when it is active, accepted, and neither
+ * revoked nor soft-deleted. Centralised so the liveness rule has one definition
+ * instead of the same four-clause boolean copied across every loader and guard.
+ */
+export const isLiveWorkspaceMembership = (
+  member: Pick<
+    WorkspaceMemberLifecycleRef,
+    "status" | "acceptedAt" | "revokedAt" | "deletedAt"
+  >,
+): boolean =>
+  member.status === "active" &&
+  member.acceptedAt !== null &&
+  member.revokedAt === null &&
+  member.deletedAt === null;
+
 const assertLiveWorkspaceMember = (
   member: WorkspaceMemberLifecycleRef,
   workspaceId: string,
 ): Either.Either<void, MemberNotInWorkspace> =>
-  member.workspaceId !== workspaceId ||
-  member.status !== "active" ||
-  member.acceptedAt === null ||
-  member.revokedAt !== null ||
-  member.deletedAt !== null
+  member.workspaceId !== workspaceId || !isLiveWorkspaceMembership(member)
     ? Either.left(new MemberNotInWorkspace({ membershipId: member.id }))
     : Either.void;
 
@@ -461,10 +473,7 @@ const assertNotLastOwner = (
     (member) =>
       member.workspaceId === workspaceId &&
       member.role === "owner" &&
-      member.status === "active" &&
-      member.acceptedAt !== null &&
-      member.revokedAt === null &&
-      member.deletedAt === null,
+      isLiveWorkspaceMembership(member),
   );
   return liveOwners.length <= 1
     ? Either.left(new LastOwnerProtected({ workspaceId }))

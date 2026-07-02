@@ -1,30 +1,35 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
-import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import type { InvitationsDoc, WorkspaceMembersDoc } from "../_generated/docs";
+import type { InvitationsDoc } from "../_generated/docs";
 import databaseSchema from "../_generated/schema";
-import { Auth, DatabaseReader, DatabaseWriter } from "../_generated/services";
+import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { stableFingerprint } from "../shared/tokenCrypto";
 import {
   Forbidden,
   InvitationNotAccessible,
-  Unauthorized,
   WorkspaceNotFound,
 } from "../errors";
+import {
+  loadCurrentUser,
+  requireActorRole,
+  toId,
+  toLifecycleMember,
+  type Reader,
+} from "./handlerContext";
 import {
   acceptInvitation,
   buildWorkspaceInvitation,
   cancelInvitation,
   declineInvitation,
+  isLiveWorkspaceMembership,
   type InvitationRef,
   type WorkspaceMemberLifecycleRef,
 } from "./lifecycle";
 import invitations from "./invitations.spec";
-import { roleAtLeast, type Role } from "./roles";
 
 const create = FunctionImpl.make(
   databaseSchema,
@@ -174,31 +179,6 @@ const cancel = FunctionImpl.make(
     }),
 );
 
-type Reader = Context.Tag.Service<typeof DatabaseReader>;
-
-const loadCurrentUser = (reader: Reader) =>
-  Effect.gen(function* () {
-    const auth = yield* Auth;
-    const identity = yield* auth.getUserIdentity.pipe(
-      Effect.mapError(() => new Unauthorized()),
-    );
-    return yield* reader
-      .table("users")
-      .index("by_subject", (q) => q.eq("subject", identity.subject))
-      .first()
-      .pipe(
-        Effect.map(Option.getOrNull),
-        Effect.flatMap((user) =>
-          user === null
-            ? Effect.fail(new Unauthorized())
-            : Effect.succeed(user),
-        ),
-        Effect.mapError((error) =>
-          error instanceof Unauthorized ? error : new Unauthorized(),
-        ),
-      );
-  });
-
 const loadActorForWorkspace = (
   reader: Reader,
   workspaceId: GenericId<"workspaces"> | string,
@@ -248,11 +228,7 @@ const loadOptionalLiveWorkspaceMemberForUser = (
         membership === null ? null : toLifecycleMember(membership),
       ),
       Effect.map((membership) =>
-        membership !== null &&
-        membership.status === "active" &&
-        membership.acceptedAt !== null &&
-        membership.revokedAt === null &&
-        membership.deletedAt === null
+        membership !== null && isLiveWorkspaceMembership(membership)
           ? membership
           : null,
       ),
@@ -275,36 +251,12 @@ const toInvitationRef = (invitation: InvitationsDoc): InvitationRef => ({
   updatedAt: invitation.updatedAt,
 });
 
-const toLifecycleMember = (
-  member: WorkspaceMembersDoc,
-): WorkspaceMemberLifecycleRef => ({
-  id: member._id,
-  workspaceId: member.workspaceId,
-  userId: member.userId,
-  role: member.role,
-  status: member.status,
-  acceptedAt: member.acceptedAt,
-  revokedAt: member.revokedAt,
-  deletedAt: member.deletedAt,
-});
-
-const requireActorRole = (
-  actor: { readonly role: Role },
-  minimumRole: Role,
-): Effect.Effect<void, Forbidden> =>
-  roleAtLeast(actor.role, minimumRole)
-    ? Effect.void
-    : Effect.fail(new Forbidden({ reason: "Insufficient workspace role." }));
-
 const requireLoadedInvitation = (
   invitation: InvitationRef | null,
 ): Effect.Effect<InvitationRef, InvitationNotAccessible> =>
   invitation === null
     ? Effect.fail(new InvitationNotAccessible())
     : Effect.succeed(invitation);
-
-const toId = <TableName extends string>(id: string): GenericId<TableName> =>
-  id as GenericId<TableName>;
 
 export default GroupImpl.make(databaseSchema, invitations).pipe(
   Layer.provide(create),
