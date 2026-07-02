@@ -1,5 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -8,9 +9,9 @@ import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { MemberNotInWorkspace } from "../errors";
 import {
+  asGenericId,
   loadCurrentUser,
   requireActorRole,
-  toId,
   toLifecycleMember,
   type Reader,
 } from "./handlerContext";
@@ -31,13 +32,13 @@ const changeRole = FunctionImpl.make(
   "changeRole",
   ({ membershipId, newRole }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
       const actor = yield* loadActorForWorkspace(reader, target.workspaceId);
       yield* requireActorRole(actor, "admin");
-      const liveMembers = yield* liveWorkspaceMembers(
+      const liveMembers = yield* liveWorkspaceMembersOrDie(
         reader,
         target.workspaceId,
       );
@@ -66,13 +67,13 @@ const remove = FunctionImpl.make(
   "remove",
   ({ membershipId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
       const actor = yield* loadActorForWorkspace(reader, target.workspaceId);
       yield* requireActorRole(actor, "admin");
-      const liveMembers = yield* liveWorkspaceMembers(
+      const liveMembers = yield* liveWorkspaceMembersOrDie(
         reader,
         target.workspaceId,
       );
@@ -100,7 +101,7 @@ const transferOwnershipImpl = FunctionImpl.make(
   "transferOwnership",
   ({ membershipId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
@@ -122,7 +123,7 @@ const transferOwnershipImpl = FunctionImpl.make(
       yield* Effect.forEach(plan.patches, (patch) =>
         writer
           .table("workspaceMembers")
-          .patch(toId<"workspaceMembers">(patch.id), patch.value)
+          .patch(asGenericId<"workspaceMembers">(patch.id), patch.value)
           .pipe(Effect.orDie),
       );
 
@@ -156,8 +157,10 @@ const loadMember = (
     .get(membershipId)
     .pipe(
       Effect.map(toLifecycleMember),
-      Effect.mapError(
-        () => new MemberNotInWorkspace({ membershipId: membershipId }),
+      Effect.catchAll((error) =>
+        error._tag === "GetByIdFailure"
+          ? Effect.fail(new MemberNotInWorkspace({ membershipId }))
+          : Effect.die(error),
       ),
     );
 
@@ -193,7 +196,7 @@ const loadLiveWorkspaceMemberForUser = (
       ),
     );
 
-const liveWorkspaceMembers = (
+const liveWorkspaceMembersOrDie = (
   reader: Reader,
   workspaceId: GenericId<"workspaces"> | string,
 ) =>

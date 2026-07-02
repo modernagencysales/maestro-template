@@ -333,6 +333,7 @@ export const acceptInvitation = (input: {
 export const declineInvitation = (input: {
   readonly invitation: InvitationRef | null;
   readonly verifiedEmail: string | null | undefined;
+  readonly userId: string;
   readonly now: number;
 }): Either.Either<
   {
@@ -366,7 +367,7 @@ export const declineInvitation = (input: {
         {
           action: "invitation.declined",
           workspaceId: invitation.workspaceId,
-          actorUserId: invitation.email,
+          actorUserId: input.userId,
           subjectKind: "invitation",
           subjectId: invitation.id,
           metadata: { reason: "declined" },

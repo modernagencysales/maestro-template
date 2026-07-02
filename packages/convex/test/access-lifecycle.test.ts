@@ -267,6 +267,7 @@ describe("workspace invitation lifecycle policy", () => {
     const blankEmailResult = declineInvitation({
       invitation: invitation({ email: "" }),
       verifiedEmail: " ",
+      userId: "users_decliner",
       now,
     });
     expect(Either.isLeft(blankEmailResult)).toBe(true);
@@ -343,6 +344,7 @@ describe("workspace invitation lifecycle policy", () => {
     const declineEither = declineInvitation({
       invitation: invitation({}),
       verifiedEmail: "ada@example.com",
+      userId: "users_decliner",
       now,
     });
     expect(Either.isRight(declineEither)).toBe(true);

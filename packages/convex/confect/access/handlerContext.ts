@@ -67,6 +67,6 @@ export const toLifecycleMember = (
   deletedAt: member.deletedAt,
 });
 
-export const toId = <TableName extends string>(
+export const asGenericId = <TableName extends string>(
   id: string,
 ): GenericId<TableName> => id as GenericId<TableName>;

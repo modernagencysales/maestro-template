@@ -1,5 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -14,9 +15,9 @@ import {
   WorkspaceNotFound,
 } from "../errors";
 import {
+  asGenericId,
   loadCurrentUser,
   requireActorRole,
-  toId,
   toLifecycleMember,
   type Reader,
 } from "./handlerContext";
@@ -37,7 +38,7 @@ const create = FunctionImpl.make(
   "create",
   ({ workspaceId, email, role }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
@@ -77,7 +78,7 @@ const accept = FunctionImpl.make(
   "accept",
   ({ invitationId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
@@ -116,7 +117,7 @@ const accept = FunctionImpl.make(
       }
 
       return {
-        workspaceId: toId<"workspaces">(acceptedInvitation.workspaceId),
+        workspaceId: asGenericId<"workspaces">(acceptedInvitation.workspaceId),
       };
     }),
 );
@@ -127,7 +128,7 @@ const decline = FunctionImpl.make(
   "decline",
   ({ invitationId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
@@ -135,6 +136,7 @@ const decline = FunctionImpl.make(
       const plan = yield* declineInvitation({
         invitation,
         verifiedEmail: user.email,
+        userId: user._id,
         now,
       });
 
@@ -155,7 +157,7 @@ const cancel = FunctionImpl.make(
   "cancel",
   ({ invitationId, workspaceId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
