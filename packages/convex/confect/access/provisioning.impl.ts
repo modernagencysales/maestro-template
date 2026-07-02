@@ -6,16 +6,15 @@ import * as Option from "effect/Option";
 
 import databaseSchema from "../_generated/schema";
 import { Auth, DatabaseReader, DatabaseWriter } from "../_generated/services";
-import { ProvisioningConflict, Unauthorized } from "../errors";
+import { Unauthorized } from "../errors";
 import provisioning from "./provisioning.spec";
 import {
   buildProvisioningPlan,
   extractIdentityProfile,
+  requireInsertValue,
   selectLiveOwnedOrganization,
   selectLiveOwnedWorkspace,
-  type OrganizationProvisioningRow,
   type UserProvisioningRow,
-  type WorkspaceProvisioningRow,
 } from "./provisioning";
 
 const ensureProvisioned = FunctionImpl.make(
@@ -47,7 +46,7 @@ const ensureProvisioned = FunctionImpl.make(
           Effect.orDie,
         );
 
-      const userPlan = buildProvisioningPlan({
+      const userPlan = (yield* buildProvisioningPlan({
         identity,
         state: {
           user: existingUser,
@@ -57,7 +56,7 @@ const ensureProvisioned = FunctionImpl.make(
           workspaceMembership: null,
         },
         now,
-      }).user;
+      })).user;
 
       const userId: GenericId<"users"> =
         existingUser === null
@@ -79,8 +78,9 @@ const ensureProvisioned = FunctionImpl.make(
         .index("by_owner", (q) => q.eq("ownerUserId", userId))
         .take(100)
         .pipe(Effect.orDie);
-      const existingOrganization = yield* selectProvisioningRow(() =>
-        selectLiveOwnedOrganization(organizations, userId),
+      const existingOrganization = yield* selectLiveOwnedOrganization(
+        organizations,
+        userId,
       );
 
       const workspaces =
@@ -93,8 +93,9 @@ const ensureProvisioned = FunctionImpl.make(
               )
               .take(100)
               .pipe(Effect.orDie);
-      const existingWorkspace = yield* selectProvisioningRow(() =>
-        selectLiveOwnedWorkspace(workspaces, userId),
+      const existingWorkspace = yield* selectLiveOwnedWorkspace(
+        workspaces,
+        userId,
       );
 
       const organizationMembership =
@@ -121,7 +122,7 @@ const ensureProvisioned = FunctionImpl.make(
               .first()
               .pipe(Effect.map(Option.getOrNull), Effect.orDie);
 
-      const plan = buildProvisioningPlan({
+      const plan = yield* buildProvisioningPlan({
         identity,
         state: {
           user: existingUser,
@@ -216,37 +217,8 @@ const toProvisioningUser = (user: {
   updatedAt: user.updatedAt,
 });
 
-const requireInsertValue = <Value>(
-  plan:
-    | { readonly action: "insert"; readonly value: Value }
-    | { readonly action: "patch" }
-    | { readonly action: "none" },
-  label: string,
-): Value => {
-  if (plan.action !== "insert") {
-    throw new Error(`Expected ${label} provisioning insert plan.`);
-  }
-  return plan.value;
-};
-
 const toId = <TableName extends string>(id: string): GenericId<TableName> =>
   id as GenericId<TableName>;
-
-const selectProvisioningRow = <
-  Row extends OrganizationProvisioningRow | WorkspaceProvisioningRow,
->(
-  select: () => Row | null,
-): Effect.Effect<Row | null, ProvisioningConflict> =>
-  Effect.try({
-    try: select,
-    catch: (error) =>
-      error instanceof ProvisioningConflict
-        ? error
-        : new ProvisioningConflict({
-            resource: "provisioning",
-            message: "Unexpected provisioning selection failure.",
-          }),
-  });
 
 export default GroupImpl.make(databaseSchema, provisioning).pipe(
   Layer.provide(ensureProvisioned),

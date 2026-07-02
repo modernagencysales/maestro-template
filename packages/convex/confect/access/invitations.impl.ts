@@ -36,7 +36,7 @@ const create = FunctionImpl.make(
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
-      requireActorRole(actor, "admin");
+      yield* requireActorRole(actor, "admin");
       const workspace = yield* reader
         .table("workspaces")
         .get(workspaceId)
@@ -49,7 +49,7 @@ const create = FunctionImpl.make(
           now,
         }),
       );
-      const plan = buildWorkspaceInvitation({
+      const plan = yield* buildWorkspaceInvitation({
         workspaceId,
         organizationId: workspace.organizationId,
         inviteeEmail: email,
@@ -85,14 +85,14 @@ const accept = FunctionImpl.make(
               invitation.workspaceId,
               user._id,
             );
-      const plan = acceptInvitation({
+      const plan = yield* acceptInvitation({
         invitation,
         verifiedEmail: user.email,
         userId: user._id,
         existingLiveMembership,
         now,
       });
-      const acceptedInvitation = requireLoadedInvitation(invitation);
+      const acceptedInvitation = yield* requireLoadedInvitation(invitation);
 
       yield* writer
         .table("invitations")
@@ -127,7 +127,7 @@ const decline = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
-      const plan = declineInvitation({
+      const plan = yield* declineInvitation({
         invitation,
         verifiedEmail: user.email,
         now,
@@ -154,7 +154,7 @@ const cancel = FunctionImpl.make(
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
-      requireActorRole(actor, "admin");
+      yield* requireActorRole(actor, "admin");
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
       const plan = cancelInvitation({
         invitation,
@@ -291,20 +291,17 @@ const toLifecycleMember = (
 const requireActorRole = (
   actor: { readonly role: Role },
   minimumRole: Role,
-): void => {
-  if (!roleAtLeast(actor.role, minimumRole)) {
-    throw new Forbidden({ reason: "Insufficient workspace role." });
-  }
-};
+): Effect.Effect<void, Forbidden> =>
+  roleAtLeast(actor.role, minimumRole)
+    ? Effect.void
+    : Effect.fail(new Forbidden({ reason: "Insufficient workspace role." }));
 
 const requireLoadedInvitation = (
   invitation: InvitationRef | null,
-): InvitationRef => {
-  if (invitation === null) {
-    throw new InvitationNotAccessible();
-  }
-  return invitation;
-};
+): Effect.Effect<InvitationRef, InvitationNotAccessible> =>
+  invitation === null
+    ? Effect.fail(new InvitationNotAccessible())
+    : Effect.succeed(invitation);
 
 const toId = <TableName extends string>(id: string): GenericId<TableName> =>
   id as GenericId<TableName>;

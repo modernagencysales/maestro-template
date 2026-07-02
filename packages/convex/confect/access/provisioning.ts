@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
 
 import {
   ProvisioningConflict,
@@ -154,10 +155,10 @@ export const buildProvisioningPlan = (input: {
   readonly identity: IdentityProfile;
   readonly state: ProvisioningState;
   readonly now: number;
-}): ProvisioningPlan => {
+}): Either.Either<ProvisioningPlan, Unauthorized> => {
   const user = input.state.user;
   if (user?.status === "suspended" || user?.status === "deleted") {
-    throw new Unauthorized();
+    return Either.left(new Unauthorized());
   }
 
   const seed = provisioningSeed(input.identity);
@@ -166,7 +167,7 @@ export const buildProvisioningPlan = (input: {
     input.state.liveOrganization?._id ?? "{organizationId}";
   const workspaceId = input.state.liveWorkspace?._id ?? "{workspaceId}";
 
-  return {
+  return Either.right({
     user: planUser(input.identity, user, input.now),
     organization: planOrganization(
       input.state.liveOrganization,
@@ -193,41 +194,66 @@ export const buildProvisioningPlan = (input: {
       userId,
       now: input.now,
     }),
-  };
+  });
+};
+
+/**
+ * Assert that a computed {@link RowPlan} is an insert and return its value.
+ * A non-insert plan here is an internal invariant violation (the caller already
+ * proved the row is absent), so a plain `throw` is correct: it becomes a
+ * genuine defect, never a client-facing typed error. Lives in this pure planner
+ * module — not the `.impl.ts` handler — so the `no-throw-in-effect-handler`
+ * gate stays satisfied and the throw is unit-testable in isolation.
+ */
+export const requireInsertValue = <Value>(
+  plan:
+    | { readonly action: "insert"; readonly value: Value }
+    | { readonly action: "patch" }
+    | { readonly action: "none" },
+  label: string,
+): Value => {
+  if (plan.action !== "insert") {
+    throw new Error(`Expected ${label} provisioning insert plan.`);
+  }
+  return plan.value;
 };
 
 export const selectLiveOwnedOrganization = (
   organizations: ReadonlyArray<OrganizationProvisioningRow>,
   userId: string,
-): OrganizationProvisioningRow | null => {
+): Either.Either<OrganizationProvisioningRow | null, ProvisioningConflict> => {
   const live = organizations.filter(
     (organization) =>
       organization.ownerUserId === userId && organization.status === "active",
   );
   if (live.length > 1) {
-    throw new ProvisioningConflict({
-      resource: "organizations",
-      message: "Multiple live owned organizations found for identity.",
-    });
+    return Either.left(
+      new ProvisioningConflict({
+        resource: "organizations",
+        message: "Multiple live owned organizations found for identity.",
+      }),
+    );
   }
-  return live.at(0) ?? null;
+  return Either.right(live.at(0) ?? null);
 };
 
 export const selectLiveOwnedWorkspace = (
   workspaces: ReadonlyArray<WorkspaceProvisioningRow>,
   userId: string,
-): WorkspaceProvisioningRow | null => {
+): Either.Either<WorkspaceProvisioningRow | null, ProvisioningConflict> => {
   const live = workspaces.filter(
     (workspace) =>
       workspace.ownerUserId === userId && workspace.status === "active",
   );
   if (live.length > 1) {
-    throw new ProvisioningConflict({
-      resource: "workspaces",
-      message: "Multiple live owned workspaces found for identity.",
-    });
+    return Either.left(
+      new ProvisioningConflict({
+        resource: "workspaces",
+        message: "Multiple live owned workspaces found for identity.",
+      }),
+    );
   }
-  return live.at(0) ?? null;
+  return Either.right(live.at(0) ?? null);
 };
 
 const planUser = (

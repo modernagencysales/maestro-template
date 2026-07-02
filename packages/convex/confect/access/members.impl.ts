@@ -31,12 +31,12 @@ const changeRole = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
       const actor = yield* loadActorForWorkspace(reader, target.workspaceId);
-      requireActorRole(actor, "admin");
+      yield* requireActorRole(actor, "admin");
       const liveMembers = yield* liveWorkspaceMembers(
         reader,
         target.workspaceId,
       );
-      const plan = changeMemberRole({
+      const plan = yield* changeMemberRole({
         actorUserId: actor.userId,
         actorRole: actor.role,
         workspaceId: target.workspaceId,
@@ -66,12 +66,12 @@ const remove = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
       const actor = yield* loadActorForWorkspace(reader, target.workspaceId);
-      requireActorRole(actor, "admin");
+      yield* requireActorRole(actor, "admin");
       const liveMembers = yield* liveWorkspaceMembers(
         reader,
         target.workspaceId,
       );
-      const plan = removeMember({
+      const plan = yield* removeMember({
         actorUserId: actor.userId,
         actorRole: actor.role,
         workspaceId: target.workspaceId,
@@ -100,13 +100,13 @@ const transferOwnershipImpl = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
       const actor = yield* loadActorForWorkspace(reader, target.workspaceId);
-      requireActorRole(actor, "owner");
+      yield* requireActorRole(actor, "owner");
       const actorMembership = yield* loadLiveWorkspaceMemberForUser(
         reader,
         target.workspaceId,
         actor.userId,
       );
-      const plan = transferOwnership({
+      const plan = yield* transferOwnership({
         actorUserId: actor.userId,
         workspaceId: target.workspaceId,
         target,
@@ -256,11 +256,10 @@ const toLifecycleMember = (
 const requireActorRole = (
   actor: { readonly role: Role },
   minimumRole: Role,
-): void => {
-  if (!roleAtLeast(actor.role, minimumRole)) {
-    throw new Forbidden({ reason: "Insufficient workspace role." });
-  }
-};
+): Effect.Effect<void, Forbidden> =>
+  roleAtLeast(actor.role, minimumRole)
+    ? Effect.void
+    : Effect.fail(new Forbidden({ reason: "Insufficient workspace role." }));
 
 const toId = <TableName extends string>(id: string): GenericId<TableName> =>
   id as GenericId<TableName>;
