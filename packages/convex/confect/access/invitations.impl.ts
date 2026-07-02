@@ -46,7 +46,13 @@ const create = FunctionImpl.make(
       const workspace = yield* reader
         .table("workspaces")
         .get(workspaceId)
-        .pipe(Effect.mapError(() => new WorkspaceNotFound({ workspaceId })));
+        .pipe(
+          Effect.catchAll((error) =>
+            error._tag === "GetByIdFailure"
+              ? Effect.fail(new WorkspaceNotFound({ workspaceId }))
+              : Effect.die(error),
+          ),
+        );
       const tokenHash = yield* Effect.promise(() =>
         stableFingerprint({
           workspaceId,

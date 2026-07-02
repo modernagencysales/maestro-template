@@ -189,10 +189,12 @@ const loadLiveWorkspaceMemberForUser = (
               new MemberNotInWorkspace({ membershipId: membership.id }),
             ),
       ),
-      Effect.mapError((error) =>
+      // Keep the typed MemberNotInWorkspace; a decode/system failure is a real
+      // defect, not a spurious "member not found".
+      Effect.catchAll((error) =>
         error instanceof MemberNotInWorkspace
-          ? error
-          : new MemberNotInWorkspace({ membershipId: "actor" }),
+          ? Effect.fail(error)
+          : Effect.die(error),
       ),
     );
 

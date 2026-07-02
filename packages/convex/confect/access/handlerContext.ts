@@ -38,8 +38,12 @@ export const loadCurrentUser = (reader: Reader) =>
             ? Effect.fail(new Unauthorized())
             : Effect.succeed(user),
         ),
-        Effect.mapError((error) =>
-          error instanceof Unauthorized ? error : new Unauthorized(),
+        // Keep the typed Unauthorized; a decode/system failure is a real defect,
+        // not a spurious authorization error.
+        Effect.catchAll((error) =>
+          error instanceof Unauthorized
+            ? Effect.fail(error)
+            : Effect.die(error),
         ),
       );
   });
