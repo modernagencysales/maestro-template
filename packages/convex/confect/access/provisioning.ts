@@ -218,43 +218,44 @@ export const requireInsertValue = <Value>(
   return plan.value;
 };
 
-export const selectLiveOwnedOrganization = (
-  organizations: ReadonlyArray<OrganizationProvisioningRow>,
+/**
+ * Select the single live workspace/organization owned by a user. More than one
+ * is a data-integrity conflict (identity provisioning guarantees at most one),
+ * so it fails `ProvisioningConflict`. Generic over the row so the org and
+ * workspace selectors share one definition instead of a copied filter+guard.
+ */
+const selectSingleLiveOwned = <
+  Row extends { readonly ownerUserId: string; readonly status: string },
+>(
+  rows: ReadonlyArray<Row>,
   userId: string,
-): Either.Either<OrganizationProvisioningRow | null, ProvisioningConflict> => {
-  const live = organizations.filter(
-    (organization) =>
-      organization.ownerUserId === userId && organization.status === "active",
+  resource: string,
+): Either.Either<Row | null, ProvisioningConflict> => {
+  const live = rows.filter(
+    (row) => row.ownerUserId === userId && row.status === "active",
   );
   if (live.length > 1) {
     return Either.left(
       new ProvisioningConflict({
-        resource: "organizations",
-        message: "Multiple live owned organizations found for identity.",
+        resource,
+        message: `Multiple live owned ${resource} found for identity.`,
       }),
     );
   }
   return Either.right(live.at(0) ?? null);
 };
 
+export const selectLiveOwnedOrganization = (
+  organizations: ReadonlyArray<OrganizationProvisioningRow>,
+  userId: string,
+): Either.Either<OrganizationProvisioningRow | null, ProvisioningConflict> =>
+  selectSingleLiveOwned(organizations, userId, "organizations");
+
 export const selectLiveOwnedWorkspace = (
   workspaces: ReadonlyArray<WorkspaceProvisioningRow>,
   userId: string,
-): Either.Either<WorkspaceProvisioningRow | null, ProvisioningConflict> => {
-  const live = workspaces.filter(
-    (workspace) =>
-      workspace.ownerUserId === userId && workspace.status === "active",
-  );
-  if (live.length > 1) {
-    return Either.left(
-      new ProvisioningConflict({
-        resource: "workspaces",
-        message: "Multiple live owned workspaces found for identity.",
-      }),
-    );
-  }
-  return Either.right(live.at(0) ?? null);
-};
+): Either.Either<WorkspaceProvisioningRow | null, ProvisioningConflict> =>
+  selectSingleLiveOwned(workspaces, userId, "workspaces");
 
 const planUser = (
   identity: IdentityProfile,
