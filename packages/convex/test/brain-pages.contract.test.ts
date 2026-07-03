@@ -28,19 +28,14 @@ describe("brain pages Confect contract", () => {
           title: "Outsider Note",
           markdown: "# nope",
         })
-        .pipe(Effect.either);
+        .pipe(Effect.flip);
     });
 
     const result = await Effect.runPromise(
       program.pipe(Effect.provide(testConfectLayer())),
     );
 
-    if (result._tag === "Right") {
-      throw new Error(
-        `expected MemberNotInWorkspace, but createMarkdown succeeded with page ${result.right}`,
-      );
-    }
-    expect(result.left).toBeInstanceOf(MemberNotInWorkspace);
-    expect(result.left._tag).toBe("MemberNotInWorkspace");
+    expect(result).toBeInstanceOf(MemberNotInWorkspace);
+    expect(result._tag).toBe("MemberNotInWorkspace");
   });
 });
