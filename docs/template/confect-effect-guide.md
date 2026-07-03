@@ -92,3 +92,23 @@ plain Convex registration shape without requiring a live Convex deployment.
 Run `check:confect-compat` after every Confect contract change. It must cover
 codegen, generated-file diffs, `@confect/test`, HTTP/Scalar fetch, React type
 fixtures, and JavaScript client type fixtures.
+
+## Generated Contract Manifest
+
+The generated Confect spec tree is the source of truth for API, CLI, MCP,
+OpenAPI, Scalar, workflow, and web-facing operation metadata. Headless metadata
+must be derived from Confect spec schemas plus explicit surface policy metadata;
+it must not be duplicated in `packages/template-core/src/index.ts`.
+
+Rules:
+
+- Every public headless operation declares a typed public error schema.
+- Every headless operation declares allowed surfaces explicitly.
+- Surface exposure defaults to an empty set.
+- Writes exposed over API, CLI, or MCP require an idempotency key argument.
+- Tenant identity is server-derived through a Principal and workspace access
+  resolver, never trusted from caller-supplied workspace slug alone.
+- OpenAPI schemas are generated from Effect schemas with `effect/JSONSchema`
+  after Confect schema restrictions are satisfied.
+- Public error envelopes encode only the declared public `_tag` and redacted
+  fields.
