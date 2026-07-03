@@ -56,20 +56,24 @@ export const requireWorkspaceAccess = (
       .table("organizations")
       .get(organizationId)
       .pipe(Effect.orDie);
+    if (organization === null) {
+      return yield* Effect.fail(new WorkspaceNotFound({ workspaceId }));
+    }
+
     const nowMs = yield* Clock.currentTimeMillis;
     const workspaceMembers = yield* reader
       .table("workspaceMembers")
       .index("by_workspace_user", (q) =>
         q.eq("workspaceId", workspaceId).eq("userId", user._id),
       )
-      .take(2)
+      .collect()
       .pipe(Effect.orDie);
     const organizationMembers = yield* reader
       .table("organizationMembers")
       .index("by_organization_user", (q) =>
         q.eq("organizationId", workspace.organizationId).eq("userId", user._id),
       )
-      .take(2)
+      .collect()
       .pipe(Effect.orDie);
     const resolution = resolveEffectiveWorkspaceRole({
       nowMs,
@@ -79,14 +83,10 @@ export const requireWorkspaceAccess = (
         organizationId: workspace.organizationId,
         status: workspace.status,
       },
-      ...(organization === null
-        ? {}
-        : {
-            organization: {
-              id: organization._id,
-              status: organization.status,
-            },
-          }),
+      organization: {
+        id: organization._id,
+        status: organization.status,
+      },
       workspaceMembers: workspaceMembers.map((member) => ({
         workspaceId: member.workspaceId,
         userId: member.userId,
@@ -110,7 +110,7 @@ export const requireWorkspaceAccess = (
     if (!resolution.ok || !roleAtLeast(resolution.role, minimumRole)) {
       return yield* Effect.fail(
         new MemberNotInWorkspace({
-          membershipId: `${workspaceId}:${user._id}`,
+          membershipId: "actor",
         }),
       );
     }
