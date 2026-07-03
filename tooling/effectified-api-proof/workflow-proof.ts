@@ -6,11 +6,15 @@ import {
   type WorkflowCtx,
   type WorkflowId,
 } from "@convex-dev/workflow";
-import type { FunctionReference, GenericMutationCtx } from "convex/server";
+import type {
+  FunctionReference,
+  GenericDataModel,
+  GenericMutationCtx,
+} from "convex/server";
 import { v } from "convex/values";
 
 declare const component: WorkflowComponent;
-declare const mutationCtx: GenericMutationCtx<any>;
+declare const mutationCtx: GenericMutationCtx<GenericDataModel>;
 declare const workflowRef: FunctionReference<
   "mutation",
   "internal",
