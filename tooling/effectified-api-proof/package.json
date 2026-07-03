@@ -6,9 +6,9 @@
     "typecheck": "tsc --noEmit --module NodeNext --moduleResolution NodeNext --target ES2022 --jsx react-jsx --skipLibCheck *.ts"
   },
   "dependencies": {
-    "@confect/core": "9.1.4",
-    "@confect/server": "9.1.4",
-    "@confect/test": "9.1.4",
+    "@confect/core": "9.1.5",
+    "@confect/server": "9.1.5",
+    "@confect/test": "9.1.5",
     "@convex-dev/workflow": "0.4.4",
     "convex": "1.42.1",
     "effect": "3.21.4"

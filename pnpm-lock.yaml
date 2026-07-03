@@ -71,8 +71,8 @@ importers:
   apps/cli:
     dependencies:
       "@confect/js":
-        specifier: 9.1.4
-        version: 9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@effect/cluster":
         specifier: 0.58.0
         version: 0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)
@@ -100,11 +100,11 @@ importers:
   apps/web:
     dependencies:
       "@confect/core":
-        specifier: 9.1.4
-        version: 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@confect/react":
-        specifier: 9.1.4
-        version: 9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)(react@19.1.0)
+        specifier: 9.1.5
+        version: 9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)(react@19.1.0)
       "@convex-dev/react-query":
         specifier: 0.1.0
         version: 0.1.0(@tanstack/react-query@5.101.0(react@19.1.0))(convex@1.42.1(react@19.1.0))
@@ -191,17 +191,17 @@ importers:
   packages/convex:
     dependencies:
       "@confect/cli":
-        specifier: 9.1.4
-        version: 9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.4(2039c884b83a97f05b594050348c6c2a))(@effect/cluster@0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.5(245075d047b38d8e4559463b286de0c9))(@effect/cluster@0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)
       "@confect/core":
-        specifier: 9.1.4
-        version: 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@confect/server":
-        specifier: 9.1.4
-        version: 9.1.4(2039c884b83a97f05b594050348c6c2a)
+        specifier: 9.1.5
+        version: 9.1.5(245075d047b38d8e4559463b286de0c9)
       "@confect/test":
-        specifier: 9.1.4
-        version: 9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.4(2039c884b83a97f05b594050348c6c2a))(convex-test@0.0.54(convex@1.42.1(react@19.1.0)))(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.5(245075d047b38d8e4559463b286de0c9))(convex-test@0.0.54(convex@1.42.1(react@19.1.0)))(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@convex-dev/migrations":
         specifier: ^0.3.5
         version: 0.3.5(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.1.0))
@@ -304,14 +304,14 @@ importers:
   tooling/effectified-api-proof:
     dependencies:
       "@confect/core":
-        specifier: 9.1.4
-        version: 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@confect/server":
-        specifier: 9.1.4
-        version: 9.1.4(2039c884b83a97f05b594050348c6c2a)
+        specifier: 9.1.5
+        version: 9.1.5(245075d047b38d8e4559463b286de0c9)
       "@confect/test":
-        specifier: 9.1.4
-        version: 9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.4(2039c884b83a97f05b594050348c6c2a))(convex-test@0.0.54(convex@1.42.1(react@19.1.0)))(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+        specifier: 9.1.5
+        version: 9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.5(245075d047b38d8e4559463b286de0c9))(convex-test@0.0.54(convex@1.42.1(react@19.1.0)))(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@convex-dev/workflow":
         specifier: 0.4.4
         version: 0.4.4(@convex-dev/workpool@0.4.7(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.1.0)))(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.1.0))
@@ -640,59 +640,59 @@ packages:
         integrity: sha512-ABkD1WhyfPZprKRQI3bhATjeiFuNWC9PXhfGWqL+sg/gKrM977oFrYkdb4msM3hgUGonr7KlOsOFT5TU2rht9g==,
       }
 
-  "@confect/cli@9.1.4":
+  "@confect/cli@9.1.5":
     resolution:
       {
-        integrity: sha512-IgOdEEeNEk4rK7FfKXrnUrUTuWmA46u+bClxl+2nWAV6kMU2Ht8yN6ilQWJBuXUoUBBaFu5IQ5X2DF9Pe2dJUA==,
+        integrity: sha512-c391/FpF399BjXd8MSdXIGScHToZhFrVcMLDBrBeWFeazXw9lpeL2/VssNZxN51Og0BGO5QSoWIUAtylIwmaYA==,
       }
     engines: { node: ">=22" }
     hasBin: true
     peerDependencies:
-      "@confect/core": ^9.1.4
-      "@confect/server": ^9.1.4
+      "@confect/core": ^9.1.5
+      "@confect/server": ^9.1.5
       effect: ^3.21.2
 
-  "@confect/core@9.1.4":
+  "@confect/core@9.1.5":
     resolution:
       {
-        integrity: sha512-rSGU1lelyxavJytLuou7ad/+vT+emIf7/u7AI5emqES2h69pyL0EgkJyshH9c5oDhbpTZ0F7e3D8g5VmdqLzYQ==,
+        integrity: sha512-RK9c+vwAGkJbU/3UJqaO7JSCX8tvxiL4DagMnCto1OdrI4jQVl+HEa0hQsvOhykvJsQNh/jntGLGFxOXiEf+4w==,
       }
     engines: { node: ">=22" }
     peerDependencies:
       convex: ^1.32.0
       effect: ^3.21.2
 
-  "@confect/js@9.1.4":
+  "@confect/js@9.1.5":
     resolution:
       {
-        integrity: sha512-szCxQRvLzWLrSOL4Qbs/UaAClrqYoMtR742EjrEvM4ThUXB6N6g/Oj0PybbqmXYyR2R72JTxXA9gtGThsmCT4A==,
+        integrity: sha512-AWwNz9K4iuLhhWpfMsOGe5w/o1DZau5/xpnU2ZV1JGO5G9XJEWFWFMYHkMtPhPyMf3P+iS0PWrwphV3EZFRklA==,
       }
     engines: { node: ">=22" }
     peerDependencies:
-      "@confect/core": ^9.1.4
+      "@confect/core": ^9.1.5
       convex: ^1.32.0
       effect: ^3.21.2
 
-  "@confect/react@9.1.4":
+  "@confect/react@9.1.5":
     resolution:
       {
-        integrity: sha512-F10SKWn7bVUPPXNN5mCIJgBYakhC1OsPPtaKwXCt2HuEGnozwYIuzcz1vJZtU0m04VEiA0h1b6SXZ/CndMEIEA==,
+        integrity: sha512-QDVwz+4DBocaKuV3G9f3mf4gN6T+EzBMbOEiouD8f3B00ljKiwobioiMC/O2pDT7Kss9TbLZvHwmrLdl0363Og==,
       }
     engines: { node: ">=22" }
     peerDependencies:
-      "@confect/core": ^9.1.4
+      "@confect/core": ^9.1.5
       convex: ^1.32.0
       effect: ^3.21.2
       react: ^18.0.0 || ^19.0.0
 
-  "@confect/server@9.1.4":
+  "@confect/server@9.1.5":
     resolution:
       {
-        integrity: sha512-jEReyW2zzbpS6A86I2AuMVpuDXtjOtHYeu+1eOhcHAZNI/ujLV1dgHZzZzfoQhNgv5ZeE0CiHYmkHaLfn0zlww==,
+        integrity: sha512-ZiSGlH5meva6i/y9YM0duhva2OdWEX+fJOr4Hja813DCwy8f3Y1L29lwWtfE0wmRLNou4fySBVO5zV4h+i56cg==,
       }
     engines: { node: ">=22" }
     peerDependencies:
-      "@confect/core": ^9.1.4
+      "@confect/core": ^9.1.5
       "@effect/platform": ^0.96.1
       "@effect/platform-node": ^0.106.0
       convex: ^1.32.0
@@ -701,15 +701,15 @@ packages:
       "@effect/platform-node":
         optional: true
 
-  "@confect/test@9.1.4":
+  "@confect/test@9.1.5":
     resolution:
       {
-        integrity: sha512-PvhdJYf5eqXPeBzbVomiWoTHf0bnQ5vMDTSZzh/y9OwrvvUErHqLyCVtT1j/1z/wwCMr9zmw3ICYqllKUSRIrQ==,
+        integrity: sha512-vanaUL5HApd9uMpV2TDbJ9gpG92ciKAfiWIKqlugrf3EQuZAWUzqA2BWzcTJkNBaoSEG6N68tRRWl3j1KnU66g==,
       }
     engines: { node: ">=22" }
     peerDependencies:
-      "@confect/core": ^9.1.4
-      "@confect/server": ^9.1.4
+      "@confect/core": ^9.1.5
+      "@confect/server": ^9.1.5
       convex: ^1.32.0
       convex-test: ">=0.0.50 <0.1.0"
       effect: ^3.21.2
@@ -8610,10 +8610,10 @@ snapshots:
 
   "@better-fetch/fetch@1.3.1": {}
 
-  "@confect/cli@9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.4(2039c884b83a97f05b594050348c6c2a))(@effect/cluster@0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)":
+  "@confect/cli@9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.5(245075d047b38d8e4559463b286de0c9))(@effect/cluster@0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4)":
     dependencies:
-      "@confect/core": 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
-      "@confect/server": 9.1.4(2039c884b83a97f05b594050348c6c2a)
+      "@confect/core": 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+      "@confect/server": 9.1.5(245075d047b38d8e4559463b286de0c9)
       "@effect/cli": 0.75.2(@effect/platform@0.96.2(effect@3.21.4))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)
       "@effect/platform": 0.96.2(effect@3.21.4)
       "@effect/platform-node": 0.106.0(@effect/cluster@0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)
@@ -8623,6 +8623,7 @@ snapshots:
       code-block-writer: 13.0.3
       effect: 3.21.4
       esbuild: 0.27.7
+      exsolve: 1.1.0
     transitivePeerDependencies:
       - "@effect/cluster"
       - "@effect/rpc"
@@ -8631,37 +8632,37 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  "@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)":
+  "@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)":
     dependencies:
       convex: 1.42.1(react@19.1.0)
       effect: 3.21.4
 
-  "@confect/js@9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)":
+  "@confect/js@9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)":
     dependencies:
-      "@confect/core": 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+      "@confect/core": 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       convex: 1.42.1(react@19.1.0)
       effect: 3.21.4
 
-  "@confect/react@9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)(react@19.1.0)":
+  "@confect/react@9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(convex@1.42.1(react@19.1.0))(effect@3.21.4)(react@19.1.0)":
     dependencies:
-      "@confect/core": 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+      "@confect/core": 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       convex: 1.42.1(react@19.1.0)
       effect: 3.21.4
       react: 19.1.0
 
-  "@confect/server@9.1.4(2039c884b83a97f05b594050348c6c2a)":
+  "@confect/server@9.1.5(245075d047b38d8e4559463b286de0c9)":
     dependencies:
-      "@confect/core": 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+      "@confect/core": 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
       "@effect/platform": 0.96.2(effect@3.21.4)
       convex: 1.42.1(react@19.1.0)
       effect: 3.21.4
     optionalDependencies:
       "@effect/platform-node": 0.106.0(@effect/cluster@0.58.0(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(@effect/rpc@0.75.1(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(@effect/platform@0.96.2(effect@3.21.4))(effect@3.21.4))(effect@3.21.4)
 
-  "@confect/test@9.1.4(@confect/core@9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.4(2039c884b83a97f05b594050348c6c2a))(convex-test@0.0.54(convex@1.42.1(react@19.1.0)))(convex@1.42.1(react@19.1.0))(effect@3.21.4)":
+  "@confect/test@9.1.5(@confect/core@9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4))(@confect/server@9.1.5(245075d047b38d8e4559463b286de0c9))(convex-test@0.0.54(convex@1.42.1(react@19.1.0)))(convex@1.42.1(react@19.1.0))(effect@3.21.4)":
     dependencies:
-      "@confect/core": 9.1.4(convex@1.42.1(react@19.1.0))(effect@3.21.4)
-      "@confect/server": 9.1.4(2039c884b83a97f05b594050348c6c2a)
+      "@confect/core": 9.1.5(convex@1.42.1(react@19.1.0))(effect@3.21.4)
+      "@confect/server": 9.1.5(245075d047b38d8e4559463b286de0c9)
       convex: 1.42.1(react@19.1.0)
       convex-test: 0.0.54(convex@1.42.1(react@19.1.0))
       effect: 3.21.4

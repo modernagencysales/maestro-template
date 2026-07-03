@@ -12,8 +12,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@confect/core": "9.1.4",
-    "@confect/react": "9.1.4",
+    "@confect/core": "9.1.5",
+    "@confect/react": "9.1.5",
     "@convex-dev/react-query": "0.1.0",
     "@maestro-template/convex": "workspace:*",
     "@maestro-template/template-core": "workspace:*",

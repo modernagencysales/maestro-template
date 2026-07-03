@@ -17,8 +17,8 @@ The goal is end-to-end typed contracts without losing Convex component support.
 
 | Surface        | Package(s)                                                                                 | Version                                           | Evidence                                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Confect server | `@confect/core`, `@confect/server`, `@confect/cli`, `@confect/test`                        | `9.1.4`                                           | Package metadata: peers require Effect `^3.21.2`, Convex `^1.32.0`, `@effect/platform` `^0.96.1`, and `@effect/platform-node` `^0.106.0`. |
-| Confect client | `@confect/react`, `@confect/js`                                                            | `9.1.4`                                           | Package metadata: peers require Effect `^3.21.2`, Convex `^1.32.0`, and React `^18` or `^19` for React hooks.                             |
+| Confect server | `@confect/core`, `@confect/server`, `@confect/cli`, `@confect/test`                        | `9.1.5`                                           | Package metadata: peers require Effect `^3.21.2`, Convex `^1.32.0`, `@effect/platform` `^0.96.1`, and `@effect/platform-node` `^0.106.0`. |
+| Confect client | `@confect/react`, `@confect/js`                                                            | `9.1.5`                                           | Package metadata: peers require Effect `^3.21.2`, Convex `^1.32.0`, and React `^18` or `^19` for React hooks.                             |
 | Effect runtime | `effect`, `@effect/platform`, `@effect/platform-node`, `@effect/cluster`, `@effect/vitest` | `3.21.4`, `0.96.2`, `0.106.0`, `0.58.0`, `0.29.0` | `@effect/platform-node@0.106.0` matches Confect's `^0.106.0` peer; `0.107.0` is intentionally not used.                                   |
 | Convex         | `convex`, `convex-test`                                                                    | `1.42.1`, `0.0.54`                                | Satisfies Confect peers and `@confect/test`'s `convex-test >=0.0.50 <0.1.0` peer.                                                         |
 
@@ -113,3 +113,36 @@ Target rules:
   after Confect schema restrictions are satisfied.
 - Public error envelopes encode only the declared public `_tag` and redacted
   fields.
+
+## Confect V9 Baseline
+
+This template treats Confect v9 as the required authoring model, not as an
+optional upgrade. The v9 release rearchitected generated Convex modules so a
+function imports only its own group registry at cold start instead of a
+project-wide aggregate. The template must preserve that benefit as it grows.
+
+Required invariants:
+
+- All `@confect/*` packages remain on the same v9-compatible release line.
+- API groups are filesystem-driven colocated `*.spec.ts` and `*.impl.ts` pairs.
+- `GroupSpec.make()` and `GroupSpec.makeNode()` do not take a group-name
+  argument; the file path names the group.
+- Every table under `packages/convex/confect/tables/*` default-exports
+  `Table.make(() => <Confect-compatible Effect schema>)`; the filename is the
+  table name. The schema may be an imported constant as long as it is built
+  lazily inside the callback.
+- Specs import generated table wrappers from `confect/_generated/tables/*` for
+  `Doc`, `Fields`, and `tableName`.
+- Specs wrap `args`, `returns`, and `error` schemas in `() =>` thunks.
+- Impls import `databaseSchema` from `confect/_generated/schema`, pass it to
+  `FunctionImpl.make` and `GroupImpl.make`, default-import the sibling spec, and
+  end with `GroupImpl.finalize`.
+- Root aggregate `confect/spec.ts`, `confect/impl.ts`, `confect/nodeSpec.ts`,
+  and `confect/nodeImpl.ts` must not exist.
+- Confect source imports Effect submodules such as `effect/Effect`,
+  `effect/Schema`, `effect/Layer`, `effect/Clock`, and `effect/Either`; it does
+  not import from the `effect` barrel inside `packages/convex/confect`.
+- `@confect/test` uses generated `confect/_generated/schema` and generated
+  `confect/_generated/convexSchema`.
+
+The compatibility gate `pnpm check:confect-v9` enforces these invariants.

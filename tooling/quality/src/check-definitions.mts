@@ -76,6 +76,7 @@ export const checkDescriptors = {
         includes: [
           "check:ci-completeness",
           "check:config-drift",
+          "check:confect-v9",
           "check:confect-contracts",
           "check:confect-compat",
           "check:workflow-graph-boundary",
@@ -437,7 +438,7 @@ export const checkDescriptors = {
         file: "docs/template/confect-effect-guide.md",
         includes: [
           "@confect/server",
-          "9.1.4",
+          "9.1.5",
           "effect",
           "3.21.4",
           "@effect/platform-node",
@@ -452,9 +453,9 @@ export const checkDescriptors = {
       {
         file: "packages/convex/package.json",
         includes: [
-          '"@confect/core": "9.1.4"',
-          '"@confect/server": "9.1.4"',
-          '"@confect/test": "9.1.4"',
+          '"@confect/core": "9.1.5"',
+          '"@confect/server": "9.1.5"',
+          '"@confect/test": "9.1.5"',
           '"@effect/platform-node": "0.106.0"',
           '"convex-test": "0.0.54"',
           '"confect:codegen"',
@@ -466,7 +467,7 @@ export const checkDescriptors = {
       {
         file: "apps/web/package.json",
         includes: [
-          '"@confect/react": "9.1.4"',
+          '"@confect/react": "9.1.5"',
           '"effect": "3.21.4"',
           '"convex": "1.42.1"',
         ],
@@ -475,7 +476,7 @@ export const checkDescriptors = {
       {
         file: "apps/cli/package.json",
         includes: [
-          '"@confect/js": "9.1.4"',
+          '"@confect/js": "9.1.5"',
           '"@effect/platform-node": "0.106.0"',
           '"effect": "3.21.4"',
         ],

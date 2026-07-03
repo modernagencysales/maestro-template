@@ -24,6 +24,7 @@ strongest first:
 | Routes stay thin; server stays at boundary    | mechanical: `template/frontend-route-thin`, `template/frontend-route-server-boundary` ESLint rules                                                                                                                                                  |
 | Keep React Flow out of durable workflow logic | mechanical: `check:workflow-graph-boundary` file pins + dependency-cruiser                                                                                                                                                                          |
 | Use Confect/Effect contracts                  | current mechanical: `check:convex` codegen drift diff; current pin-only/static: `check:confect-contracts`, `check:confect-compat`; planned by the effectification plan: semantic `@confect/test` contract tests and generated-manifest parity tests |
+| Preserve Confect v9 authoring model           | mechanical: `check:confect-v9` verifies v9 package pins, filesystem groups, lazy schema thunks, generated `DatabaseSchema` impls, no aggregate entrypoints, lazy table definitions, and submodule Effect imports                                    |
 | Do not edit generated files                   | mechanical: `check:convex` (codegen + `git diff --exit-code`); pin-only: `check:generated-files`                                                                                                                                                    |
 
 ## Code quality
