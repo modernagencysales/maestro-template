@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { Surface, type Surface as SurfaceType } from "./principal";
+import { type Surface as SurfaceType } from "./principal";
 
 export const SurfacePolicy = Schema.Struct({
   web: Schema.Boolean,
