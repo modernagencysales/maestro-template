@@ -1,0 +1,19 @@
+{
+  "name": "@maestro-template/effectified-api-proof",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --module NodeNext --moduleResolution NodeNext --target ES2022 --jsx react-jsx --skipLibCheck *.ts"
+  },
+  "dependencies": {
+    "@confect/core": "9.1.4",
+    "@confect/server": "9.1.4",
+    "@confect/test": "9.1.4",
+    "@convex-dev/workflow": "0.4.4",
+    "convex": "1.42.1",
+    "effect": "3.21.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
