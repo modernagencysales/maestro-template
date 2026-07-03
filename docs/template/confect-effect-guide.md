@@ -145,4 +145,10 @@ Required invariants:
 - `@confect/test` uses generated `confect/_generated/schema` and generated
   `confect/_generated/convexSchema`.
 
-The compatibility gate `pnpm check:confect-v9` enforces these invariants.
+The compatibility gate `pnpm check:confect-v9` currently enforces the
+mechanically checkable subset: exact v9 `@confect/*` package alignment, no root
+aggregate Confect entrypoints, no `effect` barrel imports under
+`packages/convex/confect`, lazy `args`/`returns`/`error` schema thunks in
+`FunctionSpec` object literals, generated `databaseSchema` usage plus
+`GroupImpl.finalize` in impls, and lazy table default exports without table-name
+arguments.
