@@ -1063,7 +1063,11 @@ rtk git add docs/template/effectification-status.md docs/template/confect-effect
 - Create: `tooling/quality/check-confect-v9.mts`
 - Create: `tooling/quality/check-confect-v9.test.mts`
 - Modify: `package.json`
+- Modify: `packages/convex/package.json`
+- Modify: `apps/web/package.json`
+- Modify: `apps/cli/package.json`
 - Modify: `tooling/effectified-api-proof/package.json`
+- Modify: `pnpm-lock.yaml`
 - Modify: `tooling/quality/src/check-definitions.mts`
 - Modify: `docs/template/confect-effect-guide.md`
 - Modify: `docs/template/effectification-status.md`
