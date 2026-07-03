@@ -95,12 +95,13 @@ fixtures, and JavaScript client type fixtures.
 
 ## Generated Contract Manifest
 
-The generated Confect spec tree is the source of truth for API, CLI, MCP,
-OpenAPI, Scalar, workflow, and web-facing operation metadata. Headless metadata
-must be derived from Confect spec schemas plus explicit surface policy metadata;
-it must not be duplicated in `packages/template-core/src/index.ts`.
+This migration plan introduces the target model where the generated Confect spec
+tree becomes the source of truth for API, CLI, MCP, OpenAPI, Scalar, workflow,
+and web-facing operation metadata. Today, the runtime headless projection still
+derives from the canned `templateRegistry` until later effectification tasks
+replace it with generated contract metadata.
 
-Rules:
+Target rules:
 
 - Every public headless operation declares a typed public error schema.
 - Every headless operation declares allowed surfaces explicitly.
