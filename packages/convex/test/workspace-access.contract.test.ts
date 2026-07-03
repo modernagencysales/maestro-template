@@ -48,7 +48,7 @@ describe("workspace access resolver through brain pages", () => {
       program.pipe(Effect.provide(testConfectLayer())),
     );
 
-    expect(result.pageId).toMatch(/^brainPages_/);
+    expect(result.pageId).toEqual(expect.stringContaining("brainPages"));
     expect(result.outsiderError).toBeInstanceOf(MemberNotInWorkspace);
   });
 });

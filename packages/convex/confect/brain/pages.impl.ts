@@ -1,20 +1,17 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import type { GenericId } from "convex/values";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
-import { WorkspaceNotFound } from "../errors";
+import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
 import pages from "./pages.spec";
 
-const requireWorkspace = (workspaceId: GenericId<"workspaces">) =>
-  Effect.gen(function* () {
-    const reader = yield* DatabaseReader;
-    return yield* reader
-      .table("workspaces")
-      .get(workspaceId)
-      .pipe(Effect.mapError(() => new WorkspaceNotFound({ workspaceId })));
-  });
+const withConfectClock = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
+  // Confect provides Clock at runtime, but its current handler type omits it.
+  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
 
 const list = FunctionImpl.make(
   databaseSchema,
@@ -22,7 +19,7 @@ const list = FunctionImpl.make(
   "list",
   ({ workspaceId }) =>
     Effect.gen(function* () {
-      yield* requireWorkspace(workspaceId);
+      yield* withConfectClock(requireWorkspaceAccess(workspaceId, "viewer"));
       const reader = yield* DatabaseReader;
       return yield* reader
         .table("brainPages")
@@ -38,7 +35,8 @@ const createMarkdown = FunctionImpl.make(
   "createMarkdown",
   ({ workspaceId, slug, title, markdown }) =>
     Effect.gen(function* () {
-      yield* requireWorkspace(workspaceId);
+      yield* withConfectClock(requireWorkspaceAccess(workspaceId, "editor"));
+      const updatedAt = yield* withConfectClock(Clock.currentTimeMillis);
       const writer = yield* DatabaseWriter;
       return yield* writer
         .table("brainPages")
@@ -48,7 +46,7 @@ const createMarkdown = FunctionImpl.make(
           title,
           markdown,
           sourceKind: "markdown",
-          updatedAt: Date.now(),
+          updatedAt,
         })
         .pipe(Effect.orDie);
     }),
