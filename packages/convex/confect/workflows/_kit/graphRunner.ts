@@ -181,6 +181,7 @@ export const runDurableGraphWorkflow = async (
           target,
           incomingByNode,
           joinsByNode,
+          completedNodes,
           passedEdges,
           failedEdges,
         )
@@ -361,11 +362,19 @@ const isNodeReady = (
   node: WorkflowNode,
   incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>,
   joinsByNode: ReadonlyMap<string, WorkflowJoin>,
+  completedNodes: ReadonlySet<string>,
   passedEdges: ReadonlySet<string>,
   failedEdges: ReadonlySet<string>,
 ): boolean => {
   const incoming = incomingByNode.get(node.id) ?? [];
   const join = joinsByNode.get(node.id);
+  const skippedNodes = createSkippedNodeResolver({
+    incomingByNode,
+    joinsByNode,
+    completedNodes,
+    passedEdges,
+    failedEdges,
+  });
 
   if (join?.strategy === "all-successful") {
     return join.sourceNodeIds.every((sourceNodeId) =>
@@ -389,51 +398,54 @@ const isNodeReady = (
     incoming.length === 0 ||
     (incoming.some((edge) => passedEdges.has(edge.id)) &&
       incoming.every(
-        (edge) => passedEdges.has(edge.id) || failedEdges.has(edge.id),
+        (edge) =>
+          passedEdges.has(edge.id) ||
+          failedEdges.has(edge.id) ||
+          skippedNodes.isNodeSkipped(edge.sourceNodeId),
       ))
   );
 };
 
-const findBlockedReachableNodeIds = ({
-  reachableNodeIds,
+const createSkippedNodeResolver = ({
   incomingByNode,
   joinsByNode,
   completedNodes,
   passedEdges,
   failedEdges,
 }: {
-  readonly reachableNodeIds: ReadonlySet<string>;
   readonly incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>;
   readonly joinsByNode: ReadonlyMap<string, WorkflowJoin>;
   readonly completedNodes: ReadonlySet<string>;
   readonly passedEdges: ReadonlySet<string>;
   readonly failedEdges: ReadonlySet<string>;
-}): readonly string[] => {
+}): { readonly isNodeSkipped: (nodeId: string) => boolean } => {
   const skippedNodeResults = new Map<string, boolean>();
   const visitingNodeIds = new Set<string>();
 
-  const isEdgeUnavailable = (edge: WorkflowEdge): boolean =>
-    failedEdges.has(edge.id) || isNodeSkipped(edge.sourceNodeId);
+  function isEdgeUnavailable(edge: WorkflowEdge): boolean {
+    return failedEdges.has(edge.id) || isNodeSkipped(edge.sourceNodeId);
+  }
 
-  const sourceHasPassedEdge = (
+  function sourceHasPassedEdge(
     sourceNodeId: string,
     edges: readonly WorkflowEdge[],
-  ) =>
-    edges.some(
+  ): boolean {
+    return edges.some(
       (edge) => edge.sourceNodeId === sourceNodeId && passedEdges.has(edge.id),
     );
+  }
 
-  const sourceEdgesAreUnavailable = (
+  function sourceEdgesAreUnavailable(
     sourceNodeId: string,
     edges: readonly WorkflowEdge[],
-  ) => {
+  ): boolean {
     const sourceEdges = edges.filter(
       (edge) => edge.sourceNodeId === sourceNodeId,
     );
     return sourceEdges.length > 0 && sourceEdges.every(isEdgeUnavailable);
-  };
+  }
 
-  const isNodeSkipped = (nodeId: string): boolean => {
+  function isNodeSkipped(nodeId: string): boolean {
     if (completedNodes.has(nodeId)) {
       return false;
     }
@@ -480,10 +492,37 @@ const findBlockedReachableNodeIds = ({
     visitingNodeIds.delete(nodeId);
     skippedNodeResults.set(nodeId, skipped);
     return skipped;
-  };
+  }
+
+  return { isNodeSkipped };
+};
+
+const findBlockedReachableNodeIds = ({
+  reachableNodeIds,
+  incomingByNode,
+  joinsByNode,
+  completedNodes,
+  passedEdges,
+  failedEdges,
+}: {
+  readonly reachableNodeIds: ReadonlySet<string>;
+  readonly incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>;
+  readonly joinsByNode: ReadonlyMap<string, WorkflowJoin>;
+  readonly completedNodes: ReadonlySet<string>;
+  readonly passedEdges: ReadonlySet<string>;
+  readonly failedEdges: ReadonlySet<string>;
+}): readonly string[] => {
+  const skippedNodes = createSkippedNodeResolver({
+    incomingByNode,
+    joinsByNode,
+    completedNodes,
+    passedEdges,
+    failedEdges,
+  });
 
   return [...reachableNodeIds].filter(
-    (nodeId) => !completedNodes.has(nodeId) && !isNodeSkipped(nodeId),
+    (nodeId) =>
+      !completedNodes.has(nodeId) && !skippedNodes.isNodeSkipped(nodeId),
   );
 };
 

@@ -368,6 +368,127 @@ describe("durable graph runner", () => {
     expect(events).toEqual([]);
   });
 
+  it("continues through mixed fan-in when one predecessor branch is skipped", async () => {
+    const mixedFanInGraph = {
+      id: "workflow_mixed_fan_in",
+      version: 1,
+      startNodeId: "source",
+      nodes: [
+        {
+          id: "source",
+          kind: "source",
+          label: "Source",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "active",
+          kind: "capability",
+          label: "Active",
+          capability: "activeBranch",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "skipped",
+          kind: "capability",
+          label: "Skipped",
+          capability: "skippedBranch",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "merge",
+          kind: "capability",
+          label: "Merge",
+          capability: "mergeBranch",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "output",
+          kind: "output",
+          label: "Output",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+      ],
+      edges: [
+        {
+          id: "source_active",
+          sourceNodeId: "source",
+          targetNodeId: "active",
+        },
+        {
+          id: "source_skipped",
+          sourceNodeId: "source",
+          targetNodeId: "skipped",
+          condition: { expression: "inputs.route === 'skipped'" },
+        },
+        {
+          id: "active_merge",
+          sourceNodeId: "active",
+          targetNodeId: "merge",
+        },
+        {
+          id: "skipped_merge",
+          sourceNodeId: "skipped",
+          targetNodeId: "merge",
+        },
+        {
+          id: "merge_output",
+          sourceNodeId: "merge",
+          targetNodeId: "output",
+        },
+      ],
+      joins: [],
+    } satisfies DurableWorkflowGraph;
+    const capabilityCalls: string[] = [];
+    const step: RunDurableGraphStep = {
+      runQuery: async (_ref, args) => {
+        const node = args.node as { readonly id: string };
+        capabilityCalls.push(node.id);
+        if (node.id === "active") {
+          return { selected: "active" };
+        }
+        if (node.id === "merge") {
+          const context = args.context as {
+            readonly active?: { readonly selected: string };
+          };
+          return { mergedFrom: context.active };
+        }
+        return { selected: "skipped" };
+      },
+      runAction: async () => null,
+      runMutation: async () => null,
+      sleep: async () => {},
+      awaitEvent: async <Result>() => ({}) as Result,
+    };
+
+    await expect(
+      runDurableGraphWorkflow(step, {
+        graph: mixedFanInGraph,
+        inputs: { route: "active" },
+        policySnapshot: { mode: "review" },
+        capabilityRegistry: {
+          activeBranch: {
+            kind: "query",
+            ref: classifyRef,
+          },
+          skippedBranch: {
+            kind: "query",
+            ref: classifyRef,
+          },
+          mergeBranch: {
+            kind: "query",
+            ref: classifyRef,
+          },
+        },
+        projectOutput: ({ context }) => ({
+          result: context.merge,
+        }),
+      }),
+    ).resolves.toEqual({
+      result: { mergedFrom: { selected: "active" } },
+    });
+    expect(capabilityCalls).toEqual(["active", "merge"]);
+  });
+
   it("dispatches agent nodes through registry entries tagged as agent seats", async () => {
     const actionCalls: unknown[] = [];
     const step: RunDurableGraphStep = {
