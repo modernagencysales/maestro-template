@@ -10,6 +10,63 @@ import {
 
 export type CapabilityKind = "query" | "mutation" | "action";
 
+export type ContractSurface =
+  "api" | "cli" | "mcp" | "web" | "workflow" | "internal";
+export type ContractFunctionKind = "query" | "mutation" | "action";
+
+export type SerializableContractMetadata = {
+  readonly namespace: string;
+  readonly name: string;
+  readonly operationId: string;
+  readonly kind: ContractFunctionKind;
+  readonly surfaces: readonly ContractSurface[];
+  readonly typedErrors: readonly string[];
+  readonly idempotent: boolean;
+  readonly argsSchemaName: string;
+  readonly returnsSchemaName: string;
+};
+
+export type ContractSpecMetadata = SerializableContractMetadata & {
+  readonly argsSchema: Schema.Schema.Any;
+  readonly returnsSchema: Schema.Schema.Any;
+};
+
+export type ContractSchemaRegistry = Readonly<
+  Record<string, Schema.Schema.Any>
+>;
+
+export type ManifestBoundFunction<Spec> = {
+  readonly spec: Spec;
+  readonly manifest: ContractSpecMetadata;
+};
+
+export const defineContractFunction = <Spec>(
+  spec: Spec,
+  manifest: ContractSpecMetadata,
+): ManifestBoundFunction<Spec> => ({ spec, manifest });
+
+export const collectContractManifest = (
+  functions: readonly ManifestBoundFunction<unknown>[],
+): readonly SerializableContractMetadata[] =>
+  functions.map((entry) => {
+    const {
+      argsSchema: _argsSchema,
+      returnsSchema: _returnsSchema,
+      ...serializable
+    } = entry.manifest;
+    return serializable;
+  });
+
+export const collectContractSchemas = (
+  functions: readonly ManifestBoundFunction<unknown>[],
+): ContractSchemaRegistry =>
+  Object.fromEntries(
+    functions.flatMap((entry) => [
+      [entry.manifest.argsSchemaName, entry.manifest.argsSchema],
+      [entry.manifest.returnsSchemaName, entry.manifest.returnsSchema],
+    ]),
+  );
+
 export interface CapabilityMeta {
   readonly name: string;
   readonly kind: CapabilityKind;

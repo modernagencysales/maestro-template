@@ -1,3 +1,5 @@
+import type * as Schema from "effect/Schema";
+
 export type ContractFunctionKind = "query" | "mutation" | "action";
 export type ContractSurface =
   "api" | "cli" | "mcp" | "web" | "workflow" | "internal";
@@ -20,6 +22,10 @@ export type ContractManifest = {
   readonly functions: readonly ContractFunctionManifest[];
 };
 
+export type ContractSchemaRegistry = Readonly<
+  Record<string, Schema.Schema.Any>
+>;
+
 export const buildContractManifest = (
   functions: readonly ContractFunctionManifest[],
   generatedAt = "1970-01-01T00:00:00.000Z",
@@ -34,3 +40,44 @@ export const buildContractManifest = (
 export const manifestOperationIds = (
   manifest: ContractManifest,
 ): readonly string[] => manifest.functions.map((entry) => entry.operationId);
+
+export const duplicateOperationIds = (
+  functions: readonly ContractFunctionManifest[],
+): readonly string[] => {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  for (const entry of functions) {
+    if (seen.has(entry.operationId)) {
+      duplicates.add(entry.operationId);
+      continue;
+    }
+
+    seen.add(entry.operationId);
+  }
+
+  return [...duplicates].sort((left, right) => left.localeCompare(right));
+};
+
+export const mergeContractSchemaRegistries = (
+  ...registries: readonly ContractSchemaRegistry[]
+): ContractSchemaRegistry => Object.assign({}, ...registries);
+
+export const missingSchemasForManifest = (
+  manifest: ContractManifest,
+  schemaRegistry: ContractSchemaRegistry,
+): readonly string[] => {
+  const missing = new Set<string>();
+
+  for (const entry of manifest.functions) {
+    if (!(entry.argsSchemaName in schemaRegistry)) {
+      missing.add(entry.argsSchemaName);
+    }
+
+    if (!(entry.returnsSchemaName in schemaRegistry)) {
+      missing.add(entry.returnsSchemaName);
+    }
+  }
+
+  return [...missing].sort((left, right) => left.localeCompare(right));
+};

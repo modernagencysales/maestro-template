@@ -1,39 +1,72 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { format } from "prettier";
-import { buildContractManifest, type ContractFunctionManifest } from "./index";
+import {
+  buildContractManifest,
+  duplicateOperationIds,
+  mergeContractSchemaRegistries,
+  missingSchemasForManifest,
+} from "./index";
+import {
+  manifest as sourceGroundedBriefManifest,
+  schemaRegistry as sourceGroundedBriefSchemaRegistry,
+} from "../../../packages/convex/confect/capabilities/sourceGroundedBrief.spec";
+import {
+  manifest as brainPagesManifest,
+  schemaRegistry as brainPagesSchemaRegistry,
+} from "../../../packages/convex/confect/brain/pages.spec";
 
-const functions: readonly ContractFunctionManifest[] = [
-  {
-    namespace: "brain.pages",
-    name: "list",
-    operationId: "brain.pages.list",
-    kind: "query",
-    surfaces: ["web"],
-    typedErrors: ["Unauthorized", "MemberNotInWorkspace", "WorkspaceNotFound"],
-    idempotent: true,
-    argsSchemaName: "brain.pages.list.args",
-    returnsSchemaName: "brain.pages.list.returns",
-  },
-  {
-    namespace: "brain.pages",
-    name: "createMarkdown",
-    operationId: "brain.pages.createMarkdown",
-    kind: "mutation",
-    surfaces: ["web", "api", "cli", "mcp"],
-    typedErrors: [
-      "Unauthorized",
-      "MemberNotInWorkspace",
-      "WorkspaceNotFound",
-      "ValidationFailed",
-    ],
-    idempotent: false,
-    argsSchemaName: "brain.pages.createMarkdown.args",
-    returnsSchemaName: "brain.pages.createMarkdown.returns",
-  },
-];
+const functions = [...brainPagesManifest, ...sourceGroundedBriefManifest];
+const schemaRegistry = mergeContractSchemaRegistries(
+  brainPagesSchemaRegistry,
+  sourceGroundedBriefSchemaRegistry,
+);
+
+const duplicateIds = duplicateOperationIds(functions);
+if (duplicateIds.length > 0) {
+  throw new Error(
+    `Confect manifest operation ids must be unique: ${duplicateIds.join(", ")}`,
+  );
+}
 
 const manifest = buildContractManifest(functions);
+
+const missingSchemas = missingSchemasForManifest(manifest, schemaRegistry);
+if (missingSchemas.length > 0) {
+  throw new Error(
+    `Confect manifest references schemas missing from registries: ${missingSchemas.join(", ")}`,
+  );
+}
+
+const generatedRefModules: Readonly<Record<string, string>> = {
+  "brain.pages": "packages/convex/convex/brain/pages.ts",
+  "capabilities.sourceGroundedBrief":
+    "packages/convex/convex/capabilities/sourceGroundedBrief.ts",
+};
+
+const escapeRegExp = (input: string): string =>
+  input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const missingGeneratedRefs = manifest.functions.flatMap((entry) => {
+  const modulePath = generatedRefModules[entry.namespace];
+  if (modulePath === undefined) {
+    return [`${entry.operationId} (no generated ref module configured)`];
+  }
+
+  const moduleSource = readFileSync(resolve(modulePath), "utf8");
+  const exportPattern = new RegExp(
+    `export\\s+const\\s+${escapeRegExp(entry.name)}\\s*=`,
+  );
+
+  return exportPattern.test(moduleSource) ? [] : [entry.operationId];
+});
+
+if (missingGeneratedRefs.length > 0) {
+  throw new Error(
+    `Confect manifest operations must have generated Convex refs. Run pnpm confect:codegen. Missing: ${missingGeneratedRefs.join(", ")}`,
+  );
+}
+
 const target = resolve(
   "packages/template-core/src/generated/confectManifest.ts",
 );

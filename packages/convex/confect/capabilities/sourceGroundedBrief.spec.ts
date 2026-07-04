@@ -1,6 +1,12 @@
 import { GroupSpec } from "@confect/core";
 import * as S from "effect/Schema";
-import { internalMutationStep, publicMutation } from "./_kit/capability";
+import {
+  collectContractManifest,
+  collectContractSchemas,
+  defineContractFunction,
+  internalMutationStep,
+  publicMutation,
+} from "./_kit/capability";
 
 export const SourceGroundedBriefArgs = S.Struct({
   workspaceId: S.String,
@@ -17,16 +23,65 @@ export const SourceGroundedBriefReturn = S.Struct({
   trustClaim: S.String,
 });
 
-const run = publicMutation({
-  name: "run",
-  args: () => SourceGroundedBriefArgs,
-  returns: () => SourceGroundedBriefReturn,
-});
+const run = defineContractFunction(
+  publicMutation({
+    name: "run",
+    args: () => SourceGroundedBriefArgs,
+    returns: () => SourceGroundedBriefReturn,
+  }),
+  {
+    namespace: "capabilities.sourceGroundedBrief",
+    name: "run",
+    operationId: "capabilities.sourceGroundedBrief.run",
+    kind: "mutation",
+    surfaces: ["web", "workflow", "internal"],
+    typedErrors: [
+      "Unauthorized",
+      "Forbidden",
+      "MemberNotInWorkspace",
+      "WorkspaceNotFound",
+      "ValidationFailed",
+    ],
+    idempotent: false,
+    argsSchemaName: "capabilities.sourceGroundedBrief.run.args",
+    returnsSchemaName: "capabilities.sourceGroundedBrief.run.returns",
+    argsSchema: SourceGroundedBriefArgs,
+    returnsSchema: SourceGroundedBriefReturn,
+  },
+);
 
-const runInternal = internalMutationStep({
-  name: "runInternal",
-  args: () => SourceGroundedBriefArgs,
-  returns: () => SourceGroundedBriefReturn,
-});
+const runInternal = defineContractFunction(
+  internalMutationStep({
+    name: "runInternal",
+    args: () => SourceGroundedBriefArgs,
+    returns: () => SourceGroundedBriefReturn,
+  }),
+  {
+    namespace: "capabilities.sourceGroundedBrief",
+    name: "runInternal",
+    operationId: "capabilities.sourceGroundedBrief.runInternal",
+    kind: "mutation",
+    surfaces: ["web", "workflow", "internal"],
+    typedErrors: [
+      "Unauthorized",
+      "Forbidden",
+      "MemberNotInWorkspace",
+      "WorkspaceNotFound",
+      "ValidationFailed",
+    ],
+    idempotent: false,
+    argsSchemaName: "capabilities.sourceGroundedBrief.runInternal.args",
+    returnsSchemaName: "capabilities.sourceGroundedBrief.runInternal.returns",
+    argsSchema: SourceGroundedBriefArgs,
+    returnsSchema: SourceGroundedBriefReturn,
+  },
+);
 
-export default GroupSpec.make().addFunction(run).addFunction(runInternal);
+const contractFunctions = [run, runInternal] as const;
+
+export const manifest = collectContractManifest(contractFunctions);
+export const schemaRegistry = collectContractSchemas(contractFunctions);
+
+export default GroupSpec.make()
+  .addFunction(run.spec)
+  .addFunction(runInternal.spec);
