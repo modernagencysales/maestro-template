@@ -4,6 +4,7 @@ import {
 } from "@maestro-template/template-core";
 import {
   buildOpenApiDocument,
+  openApiOperationMethods,
   type OpenApiDocument,
 } from "@maestro-template/workflow-tooling";
 import type { DurableWorkflowGraphForCanvas } from "@maestro-template/workflow-ui";
@@ -58,10 +59,17 @@ const buildOpenApiSummary = (
   docsRoute: string,
 ): OpenApiSummary => {
   const primaryOperation = document.paths[primaryOperationPath]?.post;
+  const operationCount = Object.values(document.paths).reduce(
+    (count, pathItem) =>
+      count +
+      openApiOperationMethods.filter((method) => pathItem[method] !== undefined)
+        .length,
+    0,
+  );
 
   return {
     version: document.openapi,
-    operationCount: Object.keys(document.paths).length,
+    operationCount,
     docsRoute,
     typedErrors: primaryOperation?.["x-maestro-typed-errors"] ?? [],
     authScope: primaryOperation?.["x-maestro-auth-scope"] ?? "unknown",

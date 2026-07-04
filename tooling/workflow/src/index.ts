@@ -94,6 +94,44 @@ type JsonSchema = {
   readonly additionalProperties?: boolean;
 };
 
+export const openApiOperationMethods = [
+  "get",
+  "put",
+  "post",
+  "delete",
+  "options",
+  "head",
+  "patch",
+  "trace",
+] as const;
+
+export type OpenApiOperationMethod = (typeof openApiOperationMethods)[number];
+
+export type OpenApiOperation = {
+  readonly operationId: string;
+  readonly tags: readonly string[];
+  readonly "x-maestro-auth-scope"?: string;
+  readonly "x-maestro-typed-errors": readonly string[];
+  readonly requestBody: {
+    readonly required: true;
+    readonly content: {
+      readonly "application/json": {
+        readonly schema: JsonSchema;
+      };
+    };
+  };
+  readonly responses: Record<
+    string,
+    {
+      readonly description: string;
+    }
+  >;
+};
+
+export type OpenApiPathItem = Partial<
+  Record<OpenApiOperationMethod, OpenApiOperation>
+>;
+
 export type OpenApiDocument = {
   readonly openapi: "3.1.0";
   readonly info: {
@@ -101,31 +139,7 @@ export type OpenApiDocument = {
     readonly version: string;
     readonly description: string;
   };
-  readonly paths: Record<
-    string,
-    {
-      readonly post: {
-        readonly operationId: string;
-        readonly tags: readonly string[];
-        readonly "x-maestro-auth-scope"?: string;
-        readonly "x-maestro-typed-errors": readonly string[];
-        readonly requestBody: {
-          readonly required: true;
-          readonly content: {
-            readonly "application/json": {
-              readonly schema: JsonSchema;
-            };
-          };
-        };
-        readonly responses: Record<
-          string,
-          {
-            readonly description: string;
-          }
-        >;
-      };
-    }
-  >;
+  readonly paths: Record<string, OpenApiPathItem>;
 };
 
 export type McpToolEntry = {

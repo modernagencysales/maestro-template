@@ -17,7 +17,7 @@ export const staticCliOperationRefs: Readonly<Record<string, string>> = {
   "brain.pages.createMarkdown": "brain.pages.createMarkdown",
 };
 
-export const staticCliOperationIds: ReadonlySet<string> = new Set(
+export const staticCliCapabilityIds: ReadonlySet<string> = new Set(
   Object.keys(staticCliOperationRefs),
 );
 
@@ -26,7 +26,7 @@ const runStaticCliCapability = (
   request: CliCapabilityRequest,
 ): CliResult => {
   const operationId = staticCliOperationRefs[capabilityId];
-  if (!staticCliOperationIds.has(capabilityId) || operationId === undefined) {
+  if (!staticCliCapabilityIds.has(capabilityId) || operationId === undefined) {
     return cliFailure(`Unknown CLI capability: ${capabilityId}\n`);
   }
 
@@ -41,7 +41,7 @@ const runStaticCliCapability = (
 
 const cliHandlers = createCliHandlers({
   capability: {
-    hasCapability: (capabilityId) => staticCliOperationIds.has(capabilityId),
+    hasCapability: (capabilityId) => staticCliCapabilityIds.has(capabilityId),
     runCapability: runStaticCliCapability,
   },
 });
