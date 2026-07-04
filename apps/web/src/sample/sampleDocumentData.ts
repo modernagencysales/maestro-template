@@ -26,7 +26,7 @@ import {
   providerAdapters,
   sampleRunReceipt,
   safetyChecklist,
-  stats,
+  templateStats,
 } from "./templateData";
 
 export type Diagram = {
@@ -181,7 +181,7 @@ export const overviewPage: DocumentPage = {
     {
       heading: "Technical proof",
       body: [
-        `This demo tracks ${stats.length} live health signals covering the backend, provider readiness, workflow gates, and grounded context.`,
+        `This demo tracks ${templateStats.length} live health signals covering the backend, provider readiness, workflow gates, and grounded context.`,
         "Everything client-specific is deliberately left out: the machinery is reusable, the business logic is yours.",
       ],
     },

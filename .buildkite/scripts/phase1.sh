@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Hosted agents are bare: install pinned node/pnpm and run frozen install.
-source "$SCRIPT_DIR/setup.sh"
-cd "${TEMPLATE_PR_WORKTREE:-$SCRIPT_DIR/../..}"
+source "$(dirname "$0")/setup.sh"
 
 if [[ -n "${GRAPHITE_TOKEN:-}" ]]; then
   echo "Graphite CI optimizer configured"
@@ -19,8 +16,8 @@ fi
 
 # check:secret-canaries shells out to gitleaks and check:qlty to qlty (both
 # fail closed on CI); hosted agents are bare, so install the pinned binaries.
-"$SCRIPT_DIR/install-gitleaks.sh"
-"$SCRIPT_DIR/install-qlty.sh"
+"$(dirname "$0")/install-gitleaks.sh"
+"$(dirname "$0")/install-qlty.sh"
 export PATH="${HOME}/.local/bin:${PATH}"
 
 pnpm verify

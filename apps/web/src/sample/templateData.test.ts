@@ -3,13 +3,12 @@ import {
   agents,
   brainSources,
   capabilities,
+  durableWorkflowGraph,
   headlessSurfaces,
   openApiSummary,
   providerAdapters,
   sampleRunReceipt,
   safetyChecklist,
-  workflowEdges,
-  workflowNodes,
 } from "./templateData";
 import { navItems } from "./navItems";
 
@@ -31,11 +30,11 @@ describe("template sample data", () => {
   });
 
   it("uses workflow edges that reference declared nodes", () => {
-    const nodeIds = new Set(workflowNodes.map((node) => node.id));
+    const nodeIds = new Set(durableWorkflowGraph.nodes.map((node) => node.id));
 
-    for (const edge of workflowEdges) {
-      expect(nodeIds.has(edge.source)).toBe(true);
-      expect(nodeIds.has(edge.target)).toBe(true);
+    for (const edge of durableWorkflowGraph.edges) {
+      expect(nodeIds.has(edge.sourceNodeId)).toBe(true);
+      expect(nodeIds.has(edge.targetNodeId)).toBe(true);
     }
   });
 
@@ -79,6 +78,8 @@ describe("template sample data", () => {
         trustClaim: "source-backed-no-default-rag",
       },
     });
-    expect(sampleRunReceipt.steps).toHaveLength(workflowNodes.length);
+    expect(sampleRunReceipt.steps).toHaveLength(
+      durableWorkflowGraph.nodes.length,
+    );
   });
 });

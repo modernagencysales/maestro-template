@@ -2,12 +2,21 @@ import {
   createSampleWorkflowRunReceipt,
   templateRegistry,
 } from "@maestro-template/template-core";
-import { buildOpenApiDocument } from "@maestro-template/workflow-tooling";
+import {
+  buildOpenApiDocument,
+  type OpenApiDocument,
+} from "@maestro-template/workflow-tooling";
 import type { DurableWorkflowGraphForCanvas } from "@maestro-template/workflow-ui";
 
-export const stats = templateRegistry.stats;
-export const workflowNodes = templateRegistry.workflow.nodes;
-export const workflowEdges = templateRegistry.workflow.edges;
+type OpenApiSummary = {
+  readonly version: string;
+  readonly operationCount: number;
+  readonly docsRoute: string;
+  readonly typedErrors: readonly string[];
+  readonly authScope: string;
+};
+
+export const templateStats = templateRegistry.stats;
 export const durableWorkflowGraph: DurableWorkflowGraphForCanvas = {
   id: "workflow_source_grounded_plan",
   version: 1,
@@ -42,20 +51,26 @@ export const safetyChecklist = templateRegistry.safetyChecklist;
 export const sampleRunReceipt =
   createSampleWorkflowRunReceipt(templateRegistry);
 export const openApiDocument = buildOpenApiDocument(templateRegistry);
-const primaryApiOperationPath = "/api/brain.pages.createMarkdown";
-export const openApiSummary = {
-  version: openApiDocument.openapi,
-  operationCount: Object.keys(openApiDocument.paths).length,
-  docsRoute:
-    templateRegistry.headlessSurfaces.find(
-      (surface) => surface.name === "Scalar API",
-    )?.route ?? "/api/docs",
-  typedErrors:
-    openApiDocument.paths[primaryApiOperationPath]?.post?.[
-      "x-maestro-typed-errors"
-    ] ?? [],
-  authScope:
-    openApiDocument.paths[primaryApiOperationPath]?.post?.[
-      "x-maestro-auth-scope"
-    ] ?? "unknown",
-} as const;
+
+const buildOpenApiSummary = (
+  document: OpenApiDocument,
+  primaryOperationPath: string,
+): OpenApiSummary => {
+  const primaryOperation = document.paths[primaryOperationPath]?.post;
+
+  return {
+    version: document.openapi,
+    operationCount: Object.keys(document.paths).length,
+    docsRoute:
+      templateRegistry.headlessSurfaces.find(
+        (surface) => surface.name === "Scalar API",
+      )?.route ?? "/api/docs",
+    typedErrors: primaryOperation?.["x-maestro-typed-errors"] ?? [],
+    authScope: primaryOperation?.["x-maestro-auth-scope"] ?? "unknown",
+  };
+};
+
+export const openApiSummary = buildOpenApiSummary(
+  openApiDocument,
+  "/api/brain.pages.createMarkdown",
+);
