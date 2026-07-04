@@ -41,6 +41,7 @@ export const checkDescriptors = {
         includes: [
           "OPENAI_API_KEY",
           "TASTE_PROVIDER",
+          "TASTE_OPENROUTER_MODEL",
           "extract-ai-verdict.mts",
           "TASTE_REVIEW_WORKTREE",
           "TRUSTED_TREE",

@@ -20,7 +20,10 @@ fi
 
 # The reviewer itself also fails closed when no provider is configured.
 export TASTE_REQUIRE_AUTH=1
-if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  export TASTE_PROVIDER="${TASTE_PROVIDER:-openrouter}"
+  export TASTE_OPENROUTER_MODEL="${TASTE_OPENROUTER_MODEL:-openai/gpt-5.5}"
+elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
   export TASTE_PROVIDER="${TASTE_PROVIDER:-openai}"
 fi
 
