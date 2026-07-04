@@ -77,14 +77,34 @@ describe("shared typed env access", () => {
 
 describe("TemplateRuntimeConfig", () => {
   it("loads fake localhost defaults when no provider values are set", async () => {
-    await expect(
-      Effect.runPromise(
-        runWithTemplateRuntimeConfig(loadTemplateRuntimeConfig),
-      ),
-    ).resolves.toEqual({
-      runtimeMode: "fake",
-      publicBaseUrl: "http://localhost:5173",
-    });
+    const previousRuntimeMode = process.env.TEMPLATE_RUNTIME_MODE;
+    const previousPublicBaseUrl = process.env.TEMPLATE_PUBLIC_BASE_URL;
+
+    try {
+      delete process.env.TEMPLATE_RUNTIME_MODE;
+      delete process.env.TEMPLATE_PUBLIC_BASE_URL;
+
+      await expect(
+        Effect.runPromise(
+          runWithTemplateRuntimeConfig(loadTemplateRuntimeConfig),
+        ),
+      ).resolves.toEqual({
+        runtimeMode: "fake",
+        publicBaseUrl: "http://localhost:5173",
+      });
+    } finally {
+      if (previousRuntimeMode === undefined) {
+        delete process.env.TEMPLATE_RUNTIME_MODE;
+      } else {
+        process.env.TEMPLATE_RUNTIME_MODE = previousRuntimeMode;
+      }
+
+      if (previousPublicBaseUrl === undefined) {
+        delete process.env.TEMPLATE_PUBLIC_BASE_URL;
+      } else {
+        process.env.TEMPLATE_PUBLIC_BASE_URL = previousPublicBaseUrl;
+      }
+    }
   });
 
   it("loads ambient process env when no provider is supplied", async () => {
