@@ -591,7 +591,8 @@ export const checkDescriptors = {
           "public error tag",
           "redacted public message",
           "stable cause hash",
-          "Query capture is not included",
+          "Query",
+          "capture is not included",
         ],
         message:
           "integrations docs must define PostHog backend Confect failure capture and query limitation",
