@@ -1,3 +1,4 @@
+import * as Either from "effect/Either";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -21,6 +22,16 @@ import {
 } from "../confect/errors";
 
 const now = 1_782_924_800_000;
+
+const expectRight = <A, E>(result: Either.Either<A, E>): A => {
+  expect(Either.isRight(result)).toBe(true);
+  return (result as { readonly right: A }).right;
+};
+
+const expectLeft = <A, E>(result: Either.Either<A, E>): E => {
+  expect(Either.isLeft(result)).toBe(true);
+  return (result as { readonly left: E }).left;
+};
 
 const member = (
   overrides: Partial<WorkspaceMemberLifecycleRef>,
@@ -55,22 +66,24 @@ const invitation = (overrides: Partial<InvitationRef>): InvitationRef => ({
 
 describe("workspace member lifecycle policy", () => {
   it("changes a member role when the actor can manage the target and grant the new role", () => {
-    const result = changeMemberRole({
-      actorUserId: "users_owner",
-      actorRole: "owner",
-      workspaceId: "workspaces_1",
-      target: member({ id: "workspaceMembers_2", role: "editor" }),
-      liveWorkspaceMembers: [
-        member({
-          id: "workspaceMembers_owner",
-          userId: "users_owner",
-          role: "owner",
-        }),
-        member({ id: "workspaceMembers_2", role: "editor" }),
-      ],
-      newRole: "admin",
-      now,
-    });
+    const result = expectRight(
+      changeMemberRole({
+        actorUserId: "users_owner",
+        actorRole: "owner",
+        workspaceId: "workspaces_1",
+        target: member({ id: "workspaceMembers_2", role: "editor" }),
+        liveWorkspaceMembers: [
+          member({
+            id: "workspaceMembers_owner",
+            userId: "users_owner",
+            role: "owner",
+          }),
+          member({ id: "workspaceMembers_2", role: "editor" }),
+        ],
+        newRole: "admin",
+        now,
+      }),
+    );
 
     expect(result.patch).toEqual({
       id: "workspaceMembers_2",
@@ -89,7 +102,7 @@ describe("workspace member lifecycle policy", () => {
   });
 
   it("blocks self-escalation and acting on a higher role", () => {
-    expect(() =>
+    const escalation = expectLeft(
       changeMemberRole({
         actorUserId: "users_admin",
         actorRole: "admin",
@@ -101,9 +114,10 @@ describe("workspace member lifecycle policy", () => {
         newRole: "owner",
         now,
       }),
-    ).toThrow(Forbidden);
+    );
+    expect(escalation).toBeInstanceOf(Forbidden);
 
-    expect(() =>
+    const removal = expectLeft(
       removeMember({
         actorUserId: "users_admin",
         actorRole: "admin",
@@ -115,13 +129,14 @@ describe("workspace member lifecycle policy", () => {
         ],
         now,
       }),
-    ).toThrow(Forbidden);
+    );
+    expect(removal).toBeInstanceOf(Forbidden);
   });
 
   it("protects the last owner from demotion or removal", () => {
     const owner = member({ role: "owner" });
 
-    expect(() =>
+    const demotion = expectLeft(
       changeMemberRole({
         actorUserId: "users_owner",
         actorRole: "owner",
@@ -131,9 +146,10 @@ describe("workspace member lifecycle policy", () => {
         newRole: "admin",
         now,
       }),
-    ).toThrow(LastOwnerProtected);
+    );
+    expect(demotion).toBeInstanceOf(LastOwnerProtected);
 
-    expect(() =>
+    const removal = expectLeft(
       removeMember({
         actorUserId: "users_owner",
         actorRole: "owner",
@@ -142,11 +158,12 @@ describe("workspace member lifecycle policy", () => {
         liveWorkspaceMembers: [owner],
         now,
       }),
-    ).toThrow(LastOwnerProtected);
+    );
+    expect(removal).toBeInstanceOf(LastOwnerProtected);
   });
 
   it("refuses removed, pending, revoked, or cross-workspace members", () => {
-    expect(() =>
+    const result = expectLeft(
       changeMemberRole({
         actorUserId: "users_owner",
         actorRole: "owner",
@@ -156,25 +173,28 @@ describe("workspace member lifecycle policy", () => {
         newRole: "admin",
         now,
       }),
-    ).toThrow(MemberNotInWorkspace);
+    );
+    expect(result).toBeInstanceOf(MemberNotInWorkspace);
   });
 
   it("transfers ownership by promoting the target and stepping the caller down", () => {
-    const result = transferOwnership({
-      actorUserId: "users_owner",
-      workspaceId: "workspaces_1",
-      target: member({
-        id: "workspaceMembers_target",
-        userId: "users_target",
-        role: "editor",
+    const result = expectRight(
+      transferOwnership({
+        actorUserId: "users_owner",
+        workspaceId: "workspaces_1",
+        target: member({
+          id: "workspaceMembers_target",
+          userId: "users_target",
+          role: "editor",
+        }),
+        actorMembership: member({
+          id: "workspaceMembers_actor",
+          userId: "users_owner",
+          role: "owner",
+        }),
+        now,
       }),
-      actorMembership: member({
-        id: "workspaceMembers_actor",
-        userId: "users_owner",
-        role: "owner",
-      }),
-      now,
-    });
+    );
 
     expect(result.patches).toEqual([
       {
@@ -194,15 +214,17 @@ describe("workspace member lifecycle policy", () => {
 
 describe("workspace invitation lifecycle policy", () => {
   it("builds a normalized pending invitation with an audit event", () => {
-    const result = buildWorkspaceInvitation({
-      workspaceId: "workspaces_1",
-      organizationId: "organizations_1",
-      inviteeEmail: " ADA@Example.COM ",
-      role: "editor",
-      invitedByUserId: "users_owner",
-      tokenHash: "token_hash",
-      now,
-    });
+    const result = expectRight(
+      buildWorkspaceInvitation({
+        workspaceId: "workspaces_1",
+        organizationId: "organizations_1",
+        inviteeEmail: " ADA@Example.COM ",
+        role: "editor",
+        invitedByUserId: "users_owner",
+        tokenHash: "token_hash",
+        now,
+      }),
+    );
 
     expect(result.invitation).toMatchObject({
       workspaceId: "workspaces_1",
@@ -225,7 +247,7 @@ describe("workspace invitation lifecycle policy", () => {
   });
 
   it("opaque-denies missing, wrong-email, and blank-email invite access", () => {
-    expect(() =>
+    const missing = expectLeft(
       acceptInvitation({
         invitation: null,
         verifiedEmail: "ada@example.com",
@@ -233,9 +255,10 @@ describe("workspace invitation lifecycle policy", () => {
         existingLiveMembership: null,
         now,
       }),
-    ).toThrow(InvitationNotAccessible);
+    );
+    expect(missing).toBeInstanceOf(InvitationNotAccessible);
 
-    expect(() =>
+    const wrongEmail = expectLeft(
       acceptInvitation({
         invitation: invitation({ email: "ada@example.com" }),
         verifiedEmail: "grace@example.com",
@@ -243,19 +266,21 @@ describe("workspace invitation lifecycle policy", () => {
         existingLiveMembership: null,
         now,
       }),
-    ).toThrow(InvitationNotAccessible);
+    );
+    expect(wrongEmail).toBeInstanceOf(InvitationNotAccessible);
 
-    expect(() =>
+    const blankEmail = expectLeft(
       declineInvitation({
         invitation: invitation({ email: "" }),
         verifiedEmail: " ",
         now,
       }),
-    ).toThrow(InvitationNotAccessible);
+    );
+    expect(blankEmail).toBeInstanceOf(InvitationNotAccessible);
   });
 
   it("rejects non-pending and expired invitations after verifying the invitee", () => {
-    expect(() =>
+    const nonPending = expectLeft(
       acceptInvitation({
         invitation: invitation({ status: "accepted" }),
         verifiedEmail: "ada@example.com",
@@ -263,9 +288,10 @@ describe("workspace invitation lifecycle policy", () => {
         existingLiveMembership: null,
         now,
       }),
-    ).toThrow(InvitationNotPending);
+    );
+    expect(nonPending).toBeInstanceOf(InvitationNotPending);
 
-    expect(() =>
+    const expired = expectLeft(
       acceptInvitation({
         invitation: invitation({ expiresAt: now }),
         verifiedEmail: "ada@example.com",
@@ -273,17 +299,20 @@ describe("workspace invitation lifecycle policy", () => {
         existingLiveMembership: null,
         now,
       }),
-    ).toThrow(InvitationExpired);
+    );
+    expect(expired).toBeInstanceOf(InvitationExpired);
   });
 
   it("accepts by creating one membership unless the invitee is already a live member", () => {
-    const accepted = acceptInvitation({
-      invitation: invitation({}),
-      verifiedEmail: "ADA@example.com",
-      userId: "users_ada",
-      existingLiveMembership: null,
-      now,
-    });
+    const accepted = expectRight(
+      acceptInvitation({
+        invitation: invitation({}),
+        verifiedEmail: "ADA@example.com",
+        userId: "users_ada",
+        existingLiveMembership: null,
+        now,
+      }),
+    );
 
     expect(accepted.membershipInsert).toMatchObject({
       workspaceId: "workspaces_1",
@@ -299,57 +328,67 @@ describe("workspace invitation lifecycle policy", () => {
       value: { status: "accepted", acceptedAt: now, updatedAt: now },
     });
 
-    const alreadyMember = acceptInvitation({
-      invitation: invitation({}),
-      verifiedEmail: "ada@example.com",
-      userId: "users_ada",
-      existingLiveMembership: member({ userId: "users_ada" }),
-      now,
-    });
+    const alreadyMember = expectRight(
+      acceptInvitation({
+        invitation: invitation({}),
+        verifiedEmail: "ada@example.com",
+        userId: "users_ada",
+        existingLiveMembership: member({ userId: "users_ada" }),
+        now,
+      }),
+    );
 
     expect(alreadyMember.membershipInsert).toBeNull();
   });
 
   it("declines and cancels only pending invitations", () => {
     expect(
-      declineInvitation({
-        invitation: invitation({}),
-        verifiedEmail: "ada@example.com",
-        now,
-      }).invitationPatch,
+      expectRight(
+        declineInvitation({
+          invitation: invitation({}),
+          verifiedEmail: "ada@example.com",
+          now,
+        }),
+      ).invitationPatch,
     ).toEqual({
       id: "invitations_1",
       value: { status: "declined", revokedAt: now, updatedAt: now },
     });
 
     expect(
-      cancelInvitation({
-        invitation: invitation({ workspaceId: "workspaces_1" }),
-        workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        now,
-      }).invitationPatch,
+      expectRight(
+        cancelInvitation({
+          invitation: invitation({ workspaceId: "workspaces_1" }),
+          workspaceId: "workspaces_1",
+          actorUserId: "users_owner",
+          now,
+        }),
+      ).invitationPatch,
     ).toEqual({
       id: "invitations_1",
       value: { status: "cancelled", revokedAt: now, updatedAt: now },
     });
 
     expect(
-      cancelInvitation({
-        invitation: invitation({ status: "accepted" }),
-        workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        now,
-      }).invitationPatch,
+      expectRight(
+        cancelInvitation({
+          invitation: invitation({ status: "accepted" }),
+          workspaceId: "workspaces_1",
+          actorUserId: "users_owner",
+          now,
+        }),
+      ).invitationPatch,
     ).toBeNull();
 
     expect(
-      cancelInvitation({
-        invitation: invitation({ workspaceId: "workspaces_other" }),
-        workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        now,
-      }).invitationPatch,
+      expectRight(
+        cancelInvitation({
+          invitation: invitation({ workspaceId: "workspaces_other" }),
+          workspaceId: "workspaces_1",
+          actorUserId: "users_owner",
+          now,
+        }),
+      ).invitationPatch,
     ).toBeNull();
   });
 });

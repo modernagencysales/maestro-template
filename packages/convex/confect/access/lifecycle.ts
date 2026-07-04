@@ -1,3 +1,5 @@
+import * as Either from "effect/Either";
+
 import {
   Forbidden,
   InvitationExpired,
@@ -71,6 +73,21 @@ type Patch<Value> = {
   readonly value: Value;
 };
 
+export type AccessLifecycleError =
+  | Forbidden
+  | InvitationExpired
+  | InvitationNotAccessible
+  | InvitationNotPending
+  | LastOwnerProtected
+  | MemberNotInWorkspace
+  | ValidationFailed;
+
+export type PlannerResult<A> = Either.Either<A, AccessLifecycleError>;
+
+const fail = (error: AccessLifecycleError): PlannerResult<never> =>
+  Either.left(error);
+const succeed = <A>(value: A): PlannerResult<A> => Either.right(value);
+
 export const changeMemberRole = (input: {
   readonly actorUserId: string;
   readonly actorRole: Role;
@@ -79,20 +96,33 @@ export const changeMemberRole = (input: {
   readonly liveWorkspaceMembers: readonly WorkspaceMemberLifecycleRef[];
   readonly newRole: Role;
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly patch: Patch<{ readonly role: Role; readonly updatedAt: number }>;
   readonly events: readonly AccessLifecycleEvent[];
-} => {
-  assertLiveWorkspaceMember(input.target, input.workspaceId);
-  assertActorCanManage(input.actorRole, input.target.role);
-  assertActorCanGrant(input.actorRole, input.newRole);
-  if (input.target.role === "owner" && input.newRole !== "owner") {
-    assertNotLastOwner(input.workspaceId, input.liveWorkspaceMembers);
+}> => {
+  const liveTarget = requireLiveWorkspaceMember(
+    input.target,
+    input.workspaceId,
+  );
+  if (Either.isLeft(liveTarget)) return fail(liveTarget.left);
+  const canManage = requireActorCanManage(
+    input.actorRole,
+    liveTarget.right.role,
+  );
+  if (Either.isLeft(canManage)) return fail(canManage.left);
+  const canGrant = requireActorCanGrant(input.actorRole, input.newRole);
+  if (Either.isLeft(canGrant)) return fail(canGrant.left);
+  if (liveTarget.right.role === "owner" && input.newRole !== "owner") {
+    const notLastOwner = requireNotLastOwner(
+      input.workspaceId,
+      input.liveWorkspaceMembers,
+    );
+    if (Either.isLeft(notLastOwner)) return fail(notLastOwner.left);
   }
 
-  return {
+  return succeed({
     patch: {
-      id: input.target.id,
+      id: liveTarget.right.id,
       value: { role: input.newRole, updatedAt: input.now },
     },
     events: [
@@ -101,14 +131,14 @@ export const changeMemberRole = (input: {
         workspaceId: input.workspaceId,
         actorUserId: input.actorUserId,
         subjectKind: "workspaceMember",
-        subjectId: input.target.id,
+        subjectId: liveTarget.right.id,
         metadata: {
-          previousRole: input.target.role,
+          previousRole: liveTarget.right.role,
           nextRole: input.newRole,
         },
       },
     ],
-  };
+  });
 };
 
 export const removeMember = (input: {
@@ -118,7 +148,7 @@ export const removeMember = (input: {
   readonly target: WorkspaceMemberLifecycleRef;
   readonly liveWorkspaceMembers: readonly WorkspaceMemberLifecycleRef[];
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly patch: Patch<{
     readonly status: "revoked";
     readonly revokedAt: number;
@@ -126,16 +156,28 @@ export const removeMember = (input: {
     readonly updatedAt: number;
   }>;
   readonly events: readonly AccessLifecycleEvent[];
-} => {
-  assertLiveWorkspaceMember(input.target, input.workspaceId);
-  assertActorCanManage(input.actorRole, input.target.role);
-  if (input.target.role === "owner") {
-    assertNotLastOwner(input.workspaceId, input.liveWorkspaceMembers);
+}> => {
+  const liveTarget = requireLiveWorkspaceMember(
+    input.target,
+    input.workspaceId,
+  );
+  if (Either.isLeft(liveTarget)) return fail(liveTarget.left);
+  const canManage = requireActorCanManage(
+    input.actorRole,
+    liveTarget.right.role,
+  );
+  if (Either.isLeft(canManage)) return fail(canManage.left);
+  if (liveTarget.right.role === "owner") {
+    const notLastOwner = requireNotLastOwner(
+      input.workspaceId,
+      input.liveWorkspaceMembers,
+    );
+    if (Either.isLeft(notLastOwner)) return fail(notLastOwner.left);
   }
 
-  return {
+  return succeed({
     patch: {
-      id: input.target.id,
+      id: liveTarget.right.id,
       value: {
         status: "revoked",
         revokedAt: input.now,
@@ -149,11 +191,11 @@ export const removeMember = (input: {
         workspaceId: input.workspaceId,
         actorUserId: input.actorUserId,
         subjectKind: "workspaceMember",
-        subjectId: input.target.id,
-        metadata: { role: input.target.role },
+        subjectId: liveTarget.right.id,
+        metadata: { role: liveTarget.right.role },
       },
     ],
-  };
+  });
 };
 
 export const transferOwnership = (input: {
@@ -162,31 +204,41 @@ export const transferOwnership = (input: {
   readonly target: WorkspaceMemberLifecycleRef;
   readonly actorMembership: WorkspaceMemberLifecycleRef;
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly patches: readonly Patch<{
     readonly role: Role;
     readonly updatedAt: number;
   }>[];
   readonly events: readonly AccessLifecycleEvent[];
-} => {
-  assertLiveWorkspaceMember(input.target, input.workspaceId);
-  assertLiveWorkspaceMember(input.actorMembership, input.workspaceId);
+}> => {
+  const liveTarget = requireLiveWorkspaceMember(
+    input.target,
+    input.workspaceId,
+  );
+  if (Either.isLeft(liveTarget)) return fail(liveTarget.left);
+  const liveActor = requireLiveWorkspaceMember(
+    input.actorMembership,
+    input.workspaceId,
+  );
+  if (Either.isLeft(liveActor)) return fail(liveActor.left);
   if (
-    input.target.userId === input.actorUserId ||
-    input.actorMembership.userId !== input.actorUserId ||
-    input.actorMembership.role !== "owner"
+    liveTarget.right.userId === input.actorUserId ||
+    liveActor.right.userId !== input.actorUserId ||
+    liveActor.right.role !== "owner"
   ) {
-    throw new Forbidden({ reason: "Cannot transfer workspace ownership." });
+    return fail(
+      new Forbidden({ reason: "Cannot transfer workspace ownership." }),
+    );
   }
 
-  return {
+  return succeed({
     patches: [
       {
-        id: input.target.id,
+        id: liveTarget.right.id,
         value: { role: "owner", updatedAt: input.now },
       },
       {
-        id: input.actorMembership.id,
+        id: liveActor.right.id,
         value: { role: "admin", updatedAt: input.now },
       },
     ],
@@ -196,11 +248,11 @@ export const transferOwnership = (input: {
         workspaceId: input.workspaceId,
         actorUserId: input.actorUserId,
         subjectKind: "workspaceMember",
-        subjectId: input.target.id,
-        metadata: { previousRole: input.target.role, nextRole: "owner" },
+        subjectId: liveTarget.right.id,
+        metadata: { previousRole: liveTarget.right.role, nextRole: "owner" },
       },
     ],
-  };
+  });
 };
 
 export const buildWorkspaceInvitation = (input: {
@@ -211,15 +263,16 @@ export const buildWorkspaceInvitation = (input: {
   readonly invitedByUserId: string;
   readonly tokenHash: string;
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly invitation: Omit<InvitationRef, "id">;
   readonly events: readonly AccessLifecycleEvent[];
-} => {
+}> => {
   const email = requireNormalizedEmail(input.inviteeEmail, "email");
+  if (Either.isLeft(email)) return fail(email.left);
   const invitation = {
     workspaceId: input.workspaceId,
     organizationId: input.organizationId,
-    email,
+    email: email.right,
     role: input.role,
     status: "pending" as const,
     tokenHash: input.tokenHash,
@@ -231,7 +284,7 @@ export const buildWorkspaceInvitation = (input: {
     updatedAt: input.now,
   };
 
-  return {
+  return succeed({
     invitation,
     events: [
       {
@@ -240,10 +293,10 @@ export const buildWorkspaceInvitation = (input: {
         actorUserId: input.invitedByUserId,
         subjectKind: "invitation",
         subjectId: input.tokenHash,
-        metadata: { email, role: input.role },
+        metadata: { email: email.right, role: input.role },
       },
     ],
-  };
+  });
 };
 
 export const acceptInvitation = (input: {
@@ -252,7 +305,7 @@ export const acceptInvitation = (input: {
   readonly userId: string;
   readonly existingLiveMembership: WorkspaceMemberLifecycleRef | null;
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly invitationPatch: Patch<{
     readonly status: "accepted";
     readonly acceptedAt: number;
@@ -260,19 +313,21 @@ export const acceptInvitation = (input: {
   }>;
   readonly membershipInsert: Omit<WorkspaceMemberLifecycleRef, "id"> | null;
   readonly events: readonly AccessLifecycleEvent[];
-} => {
+}> => {
   const invitation = requireAccessibleInvitation(
     input.invitation,
     input.verifiedEmail,
   );
-  assertInvitationPending(invitation);
-  if (invitation.expiresAt <= input.now) {
-    throw new InvitationExpired({ invitationId: invitation.id });
+  if (Either.isLeft(invitation)) return fail(invitation.left);
+  const pending = requireInvitationPending(invitation.right);
+  if (Either.isLeft(pending)) return fail(pending.left);
+  if (invitation.right.expiresAt <= input.now) {
+    return fail(new InvitationExpired({ invitationId: invitation.right.id }));
   }
 
-  return {
+  return succeed({
     invitationPatch: {
-      id: invitation.id,
+      id: invitation.right.id,
       value: {
         status: "accepted",
         acceptedAt: input.now,
@@ -282,9 +337,9 @@ export const acceptInvitation = (input: {
     membershipInsert:
       input.existingLiveMembership === null
         ? {
-            workspaceId: invitation.workspaceId,
+            workspaceId: invitation.right.workspaceId,
             userId: input.userId,
-            role: invitation.role,
+            role: invitation.right.role,
             status: "active",
             acceptedAt: input.now,
             revokedAt: null,
@@ -294,38 +349,39 @@ export const acceptInvitation = (input: {
     events: [
       {
         action: "invitation.accepted",
-        workspaceId: invitation.workspaceId,
+        workspaceId: invitation.right.workspaceId,
         actorUserId: input.userId,
         subjectKind: "invitation",
-        subjectId: invitation.id,
+        subjectId: invitation.right.id,
         metadata: { acceptedByUserId: input.userId },
       },
     ],
-  };
+  });
 };
 
 export const declineInvitation = (input: {
   readonly invitation: InvitationRef | null;
   readonly verifiedEmail: string | null | undefined;
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly invitationPatch: Patch<{
     readonly status: "declined";
     readonly revokedAt: number;
     readonly updatedAt: number;
   }> | null;
   readonly events: readonly AccessLifecycleEvent[];
-} => {
+}> => {
   const invitation = requireAccessibleInvitation(
     input.invitation,
     input.verifiedEmail,
   );
-  if (invitation.status !== "pending") {
-    return { invitationPatch: null, events: [] };
+  if (Either.isLeft(invitation)) return fail(invitation.left);
+  if (invitation.right.status !== "pending") {
+    return succeed({ invitationPatch: null, events: [] });
   }
-  return {
+  return succeed({
     invitationPatch: {
-      id: invitation.id,
+      id: invitation.right.id,
       value: {
         status: "declined",
         revokedAt: input.now,
@@ -335,14 +391,14 @@ export const declineInvitation = (input: {
     events: [
       {
         action: "invitation.declined",
-        workspaceId: invitation.workspaceId,
-        actorUserId: invitation.email,
+        workspaceId: invitation.right.workspaceId,
+        actorUserId: invitation.right.email,
         subjectKind: "invitation",
-        subjectId: invitation.id,
+        subjectId: invitation.right.id,
         metadata: { reason: "declined" },
       },
     ],
-  };
+  });
 };
 
 export const cancelInvitation = (input: {
@@ -350,22 +406,22 @@ export const cancelInvitation = (input: {
   readonly workspaceId: string;
   readonly actorUserId: string;
   readonly now: number;
-}): {
+}): PlannerResult<{
   readonly invitationPatch: Patch<{
     readonly status: "cancelled";
     readonly revokedAt: number;
     readonly updatedAt: number;
   }> | null;
   readonly events: readonly AccessLifecycleEvent[];
-} => {
+}> => {
   if (
     input.invitation === null ||
     input.invitation.workspaceId !== input.workspaceId ||
     input.invitation.status !== "pending"
   ) {
-    return { invitationPatch: null, events: [] };
+    return succeed({ invitationPatch: null, events: [] });
   }
-  return {
+  return succeed({
     invitationPatch: {
       id: input.invitation.id,
       value: {
@@ -384,13 +440,13 @@ export const cancelInvitation = (input: {
         metadata: { reason: "cancelled" },
       },
     ],
-  };
+  });
 };
 
-const assertLiveWorkspaceMember = (
+const requireLiveWorkspaceMember = (
   member: WorkspaceMemberLifecycleRef,
   workspaceId: string,
-): void => {
+): PlannerResult<WorkspaceMemberLifecycleRef> => {
   if (
     member.workspaceId !== workspaceId ||
     member.status !== "active" ||
@@ -398,30 +454,43 @@ const assertLiveWorkspaceMember = (
     member.revokedAt !== null ||
     member.deletedAt !== null
   ) {
-    throw new MemberNotInWorkspace({ membershipId: member.id });
+    return fail(new MemberNotInWorkspace({ membershipId: member.id }));
   }
+  return succeed(member);
 };
 
-const assertActorCanManage = (actorRole: Role, targetRole: Role): void => {
+const requireActorCanManage = (
+  actorRole: Role,
+  targetRole: Role,
+): PlannerResult<void> => {
   if (!roleAtLeast(actorRole, targetRole)) {
-    throw new Forbidden({
-      reason: "Cannot manage a member with a higher role.",
-    });
+    return fail(
+      new Forbidden({
+        reason: "Cannot manage a member with a higher role.",
+      }),
+    );
   }
+  return succeed(undefined);
 };
 
-const assertActorCanGrant = (actorRole: Role, newRole: Role): void => {
+const requireActorCanGrant = (
+  actorRole: Role,
+  newRole: Role,
+): PlannerResult<void> => {
   if (!roleAtLeast(actorRole, newRole)) {
-    throw new Forbidden({
-      reason: "Cannot grant a role higher than your own.",
-    });
+    return fail(
+      new Forbidden({
+        reason: "Cannot grant a role higher than your own.",
+      }),
+    );
   }
+  return succeed(undefined);
 };
 
-const assertNotLastOwner = (
+const requireNotLastOwner = (
   workspaceId: string,
   members: readonly WorkspaceMemberLifecycleRef[],
-): void => {
+): PlannerResult<void> => {
   const liveOwners = members.filter(
     (member) =>
       member.workspaceId === workspaceId &&
@@ -432,19 +501,25 @@ const assertNotLastOwner = (
       member.deletedAt === null,
   );
   if (liveOwners.length <= 1) {
-    throw new LastOwnerProtected({ workspaceId });
+    return fail(new LastOwnerProtected({ workspaceId }));
   }
+  return succeed(undefined);
 };
 
-const requireNormalizedEmail = (value: string, field: string): string => {
+const requireNormalizedEmail = (
+  value: string,
+  field: string,
+): PlannerResult<string> => {
   const normalized = normalizeEmail(value);
   if (normalized.kind !== "verified") {
-    throw new ValidationFailed({
-      field,
-      message: "A valid email address is required.",
-    });
+    return fail(
+      new ValidationFailed({
+        field,
+        message: "A valid email address is required.",
+      }),
+    );
   }
-  return normalized.email;
+  return succeed(normalized.email);
 };
 
 const normalizeAccessibleEmail = (
@@ -457,20 +532,23 @@ const normalizeAccessibleEmail = (
 const requireAccessibleInvitation = (
   invitation: InvitationRef | null,
   verifiedEmail: string | null | undefined,
-): InvitationRef => {
+): PlannerResult<InvitationRef> => {
   const email = normalizeAccessibleEmail(verifiedEmail);
   if (invitation === null || email === null) {
-    throw new InvitationNotAccessible();
+    return fail(new InvitationNotAccessible());
   }
   const invitationEmail = normalizeAccessibleEmail(invitation.email);
   if (invitationEmail === null || invitationEmail !== email) {
-    throw new InvitationNotAccessible();
+    return fail(new InvitationNotAccessible());
   }
-  return invitation;
+  return succeed(invitation);
 };
 
-const assertInvitationPending = (invitation: InvitationRef): void => {
+const requireInvitationPending = (
+  invitation: InvitationRef,
+): PlannerResult<void> => {
   if (invitation.status !== "pending") {
-    throw new InvitationNotPending({ invitationId: invitation.id });
+    return fail(new InvitationNotPending({ invitationId: invitation.id }));
   }
+  return succeed(undefined);
 };
