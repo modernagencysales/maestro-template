@@ -2,7 +2,9 @@ import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import {
   MemberNotInWorkspace,
+  NotFound,
   Unauthorized,
+  ValidationFailed,
   WorkspaceNotFound,
 } from "../errors";
 import { Id } from "../_generated/id";
@@ -33,6 +35,17 @@ const CreateMarkdownArgs = Schema.Struct({
 });
 
 const CreateMarkdownReturns = Id("brainPages");
+
+export const RecordSnapshotArgs = Schema.Struct({
+  workspaceId: Id("workspaces"),
+  pageId: Id("brainPages"),
+  snapshot: Schema.String,
+  version: Schema.Number,
+});
+
+export const RecordSnapshotReturns = Schema.Struct({
+  ok: Schema.Literal(true),
+});
 
 const list = defineContractFunction(
   FunctionSpec.publicQuery({
@@ -78,6 +91,13 @@ const createMarkdown = defineContractFunction(
   },
 );
 
+const recordSnapshotInternal = FunctionSpec.internalMutation({
+  name: "recordSnapshotInternal",
+  args: () => RecordSnapshotArgs,
+  returns: () => RecordSnapshotReturns,
+  error: () => Schema.Union(NotFound, ValidationFailed),
+});
+
 const contractFunctions = [list, createMarkdown] as const;
 
 export const manifest = collectContractManifest(contractFunctions);
@@ -85,4 +105,5 @@ export const schemaRegistry = collectContractSchemas(contractFunctions);
 
 export default GroupSpec.make()
   .addFunction(list.spec)
-  .addFunction(createMarkdown.spec);
+  .addFunction(createMarkdown.spec)
+  .addFunction(recordSnapshotInternal);

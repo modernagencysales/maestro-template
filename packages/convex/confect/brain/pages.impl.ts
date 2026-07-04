@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
+import { NotFound, ValidationFailed } from "../errors";
 import { withMutationErrorCapture } from "../observability/errorCapture";
 import pages from "./pages.spec";
 
@@ -56,8 +57,49 @@ const createMarkdown = FunctionImpl.make(
     ),
 );
 
+const recordSnapshotInternal = FunctionImpl.make(
+  databaseSchema,
+  pages,
+  "recordSnapshotInternal",
+  ({ workspaceId, pageId, snapshot, version }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
+      const page = yield* reader
+        .table("brainPages")
+        .get(pageId)
+        .pipe(
+          Effect.mapError(
+            () => new NotFound({ resource: "brainPages", id: pageId }),
+          ),
+        );
+
+      if (page.workspaceId !== workspaceId) {
+        return yield* Effect.fail(
+          new ValidationFailed({
+            field: "workspaceId",
+            message: "Brain page does not belong to workspace.",
+          }),
+        );
+      }
+
+      const updatedAt = yield* withConfectClock(Clock.currentTimeMillis);
+      yield* writer
+        .table("brainPages")
+        .patch(pageId, {
+          editorSnapshotJson: snapshot,
+          editorSnapshotVersion: version,
+          updatedAt,
+        })
+        .pipe(Effect.orDie);
+
+      return { ok: true as const };
+    }),
+);
+
 export default GroupImpl.make(databaseSchema, pages).pipe(
   Layer.provide(list),
   Layer.provide(createMarkdown),
+  Layer.provide(recordSnapshotInternal),
   GroupImpl.finalize,
 );

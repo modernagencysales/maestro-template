@@ -17,6 +17,7 @@ import type * as brain_pages from "../brain/pages.js";
 import type * as capabilities_catalog from "../capabilities/catalog.js";
 import type * as capabilities_sourceGroundedBrief from "../capabilities/sourceGroundedBrief.js";
 import type * as demo_showcase from "../demo/showcase.js";
+import type * as editorSync from "../editorSync.js";
 import type * as http from "../http.js";
 import type * as jobs_workpool from "../jobs/workpool.js";
 import type * as ops_actions from "../ops/actions.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "capabilities/catalog": typeof capabilities_catalog;
   "capabilities/sourceGroundedBrief": typeof capabilities_sourceGroundedBrief;
   "demo/showcase": typeof demo_showcase;
+  editorSync: typeof editorSync;
   http: typeof http;
   "jobs/workpool": typeof jobs_workpool;
   "ops/actions": typeof ops_actions;
