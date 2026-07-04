@@ -263,6 +263,20 @@ const executorRequestFor = (
   };
 };
 
+const runTemplateApiOperation = async (
+  ctx: HeadlessHttpCtx,
+  request: HeadlessExecutorRequest,
+): Promise<unknown> =>
+  await executeHeadlessOperation(
+    {
+      refs: operationRefs,
+      runQuery: (ref, input) => ctx.runQuery(ref, input),
+      runMutation: (ref, input) => ctx.runMutation(ref, input),
+      runAction: (ref, input) => ctx.runAction(ref, input),
+    },
+    request,
+  );
+
 export const handleTemplateHttpRequest = async (
   ctx: HeadlessHttpCtx,
   request: Request,
@@ -327,15 +341,7 @@ export const handleTemplateHttpRequest = async (
     }
 
     return jsonResponse(
-      await executeHeadlessOperation(
-        {
-          refs: operationRefs,
-          runQuery: (ref, input) => ctx.runQuery(ref, input),
-          runMutation: (ref, input) => ctx.runMutation(ref, input),
-          runAction: (ref, input) => ctx.runAction(ref, input),
-        },
-        executorRequest.request,
-      ),
+      await runTemplateApiOperation(ctx, executorRequest.request),
     );
   }
 

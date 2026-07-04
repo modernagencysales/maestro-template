@@ -40,6 +40,7 @@ const isRuntimeFile = (path: string): boolean =>
   isSourceFile(path) &&
   !path.includes(".test.") &&
   !path.includes("/__tests__/") &&
+  !path.includes("/test/") &&
   !path.includes("/_generated/");
 
 async function listFiles(root: string, current = root): Promise<string[]> {
