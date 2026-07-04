@@ -317,6 +317,57 @@ describe("durable graph runner", () => {
     ).toHaveLength(graph.nodes.length);
   });
 
+  it("skips false conditional branches and returns completed active context", async () => {
+    const actionCalls: unknown[] = [];
+    const sleeps: Array<{
+      readonly delayMs: number;
+      readonly name: string | undefined;
+    }> = [];
+    const events: string[] = [];
+    const inputs = { kind: "lead", email: "founder@example.test" };
+    const classifyResult = { route: "rejected", reason: "policy" };
+
+    const step: RunDurableGraphStep = {
+      runQuery: async () => classifyResult,
+      runAction: async (ref, args) => {
+        actionCalls.push({ ref, args });
+        return { enriched: true };
+      },
+      runMutation: async () => null,
+      sleep: async (delayMs, options) => {
+        sleeps.push({ delayMs, name: options?.name });
+      },
+      awaitEvent: async <Result>(event: { readonly name: string }) => {
+        events.push(event.name);
+        return { approvedBy: "user_123" } as Result;
+      },
+    };
+
+    await expect(
+      runDurableGraphWorkflow(step, {
+        graph,
+        inputs,
+        policySnapshot: { mode: "review", version: 2 },
+        capabilityRegistry: {
+          classifyLead: {
+            kind: "query",
+            ref: classifyRef,
+          },
+          enrichLead: {
+            kind: "action",
+            ref: enrichRef,
+          },
+        },
+      }),
+    ).resolves.toEqual({
+      source: inputs,
+      classify: classifyResult,
+    });
+    expect(actionCalls).toHaveLength(0);
+    expect(sleeps).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
   it("dispatches agent nodes through registry entries tagged as agent seats", async () => {
     const actionCalls: unknown[] = [];
     const step: RunDurableGraphStep = {

@@ -191,9 +191,14 @@ export const runDurableGraphWorkflow = async (
     }
   }
 
-  const blockedReachableNodeIds = [...reachableNodeIds].filter(
-    (nodeId) => !completedNodes.has(nodeId),
-  );
+  const blockedReachableNodeIds = findBlockedReachableNodeIds({
+    reachableNodeIds,
+    incomingByNode,
+    joinsByNode,
+    completedNodes,
+    passedEdges,
+    failedEdges,
+  });
   if (blockedReachableNodeIds.length > 0) {
     throw makePublicError(
       "VALIDATION_FAILED",
@@ -386,6 +391,99 @@ const isNodeReady = (
       incoming.every(
         (edge) => passedEdges.has(edge.id) || failedEdges.has(edge.id),
       ))
+  );
+};
+
+const findBlockedReachableNodeIds = ({
+  reachableNodeIds,
+  incomingByNode,
+  joinsByNode,
+  completedNodes,
+  passedEdges,
+  failedEdges,
+}: {
+  readonly reachableNodeIds: ReadonlySet<string>;
+  readonly incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>;
+  readonly joinsByNode: ReadonlyMap<string, WorkflowJoin>;
+  readonly completedNodes: ReadonlySet<string>;
+  readonly passedEdges: ReadonlySet<string>;
+  readonly failedEdges: ReadonlySet<string>;
+}): readonly string[] => {
+  const skippedNodeResults = new Map<string, boolean>();
+  const visitingNodeIds = new Set<string>();
+
+  const isEdgeUnavailable = (edge: WorkflowEdge): boolean =>
+    failedEdges.has(edge.id) || isNodeSkipped(edge.sourceNodeId);
+
+  const sourceHasPassedEdge = (
+    sourceNodeId: string,
+    edges: readonly WorkflowEdge[],
+  ) =>
+    edges.some(
+      (edge) => edge.sourceNodeId === sourceNodeId && passedEdges.has(edge.id),
+    );
+
+  const sourceEdgesAreUnavailable = (
+    sourceNodeId: string,
+    edges: readonly WorkflowEdge[],
+  ) => {
+    const sourceEdges = edges.filter(
+      (edge) => edge.sourceNodeId === sourceNodeId,
+    );
+    return sourceEdges.length > 0 && sourceEdges.every(isEdgeUnavailable);
+  };
+
+  const isNodeSkipped = (nodeId: string): boolean => {
+    if (completedNodes.has(nodeId)) {
+      return false;
+    }
+    const memoized = skippedNodeResults.get(nodeId);
+    if (memoized !== undefined) {
+      return memoized;
+    }
+    if (visitingNodeIds.has(nodeId)) {
+      return false;
+    }
+
+    visitingNodeIds.add(nodeId);
+    const incoming = incomingByNode.get(nodeId) ?? [];
+    const join = joinsByNode.get(nodeId);
+    let skipped = false;
+
+    if (incoming.length > 0) {
+      if (join?.strategy === "all-successful") {
+        const everyJoinSourceResolved = join.sourceNodeIds.every(
+          (sourceNodeId) =>
+            sourceHasPassedEdge(sourceNodeId, incoming) ||
+            sourceEdgesAreUnavailable(sourceNodeId, incoming),
+        );
+        const everyJoinSourcePassed = join.sourceNodeIds.every((sourceNodeId) =>
+          sourceHasPassedEdge(sourceNodeId, incoming),
+        );
+        skipped = everyJoinSourceResolved && !everyJoinSourcePassed;
+      } else if (join?.strategy === "any-successful") {
+        const anyJoinSourcePassed = join.sourceNodeIds.some((sourceNodeId) =>
+          sourceHasPassedEdge(sourceNodeId, incoming),
+        );
+        skipped =
+          !anyJoinSourcePassed &&
+          join.sourceNodeIds.every((sourceNodeId) =>
+            sourceEdgesAreUnavailable(sourceNodeId, incoming),
+          );
+      } else {
+        skipped =
+          !incoming.some((edge) => passedEdges.has(edge.id)) &&
+          incoming.every(isEdgeUnavailable);
+      }
+    }
+
+    visitingNodeIds.delete(nodeId);
+    skippedNodeResults.set(nodeId, skipped);
+    return skipped;
+  };
+
+  return [...reachableNodeIds].filter(
+    (nodeId) => !completedNodes.has(nodeId) && !isNodeSkipped(nodeId),
   );
 };
 
