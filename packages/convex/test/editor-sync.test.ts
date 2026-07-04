@@ -1,4 +1,5 @@
 import type { GenericMutationCtx, GenericQueryCtx } from "convex/server";
+import { ConvexError } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
 import type { DataModel } from "../convex/_generated/dataModel";
 import { parseEditorTarget } from "../confect/editor/documentTargets";
@@ -140,7 +141,28 @@ describe("editor sync registration", () => {
 
     await expect(
       requireEditorDocumentAccess(ctx, "brainPage:page_1", "viewer"),
-    ).rejects.toThrow("Editor sync requires authentication.");
+    ).rejects.toMatchObject({
+      data: {
+        _tag: "EditorSyncAccessDenied",
+        reason: "authentication",
+      },
+    });
+    await expect(
+      requireEditorDocumentAccess(ctx, "brainPage:page_1", "viewer"),
+    ).rejects.toThrow(ConvexError);
+  });
+
+  it("rejects unsupported document targets with tagged ConvexError data", async () => {
+    const { ctx } = makeAuthCtx();
+
+    await expect(
+      requireEditorDocumentAccess(ctx, "document_1", "viewer"),
+    ).rejects.toMatchObject({
+      data: {
+        _tag: "EditorSyncAccessDenied",
+        reason: "unsupported-target",
+      },
+    });
   });
 
   it("resolves user and workspace membership before allowing editor writes", async () => {
@@ -182,7 +204,12 @@ describe("editor sync registration", () => {
 
     await expect(
       requireEditorDocumentAccess(ctx, "brainPage:page_1", "viewer"),
-    ).rejects.toThrow("active user");
+    ).rejects.toMatchObject({
+      data: {
+        _tag: "EditorSyncAccessDenied",
+        reason: "active-user",
+      },
+    });
   });
 
   it("rejects lifecycle-invalid direct workspace memberships", async () => {
@@ -219,7 +246,12 @@ describe("editor sync registration", () => {
 
       await expect(
         requireEditorDocumentAccess(ctx, "brainPage:page_1", "viewer"),
-      ).rejects.toThrow("workspace membership");
+      ).rejects.toMatchObject({
+        data: {
+          _tag: "EditorSyncAccessDenied",
+          reason: "workspace-membership",
+        },
+      });
     }
   });
 

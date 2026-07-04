@@ -15,8 +15,8 @@ contract family.
 - Confect specs and impls exist for access, Brain pages, capabilities, jobs,
   ops, agents, auth, demo, editor sync, workflow contracts, and manifest
   surfaces.
-- Public Confect specs declare typed errors, and public error families use
-  `Schema.TaggedError` classes.
+- Public Confect-provenance specs declare typed errors, and public error
+  families use `Schema.TaggedError` classes.
 - Workspace-sensitive public paths resolve a Principal and workspace access
   server-side instead of trusting caller-supplied workspace identity.
 - Generated Confect refs, schema, Convex schema, and registered function files
@@ -44,6 +44,11 @@ contract family.
 - `brain/pages.createMarkdown` is the first Confect mutation wrapped with
   backend PostHog failure capture.
 - Remaining Confect groups are still unwrapped pending rollout/factory support.
+- Access lifecycle planners emit audit-event values, including invitation
+  lifecycle events, but tenancy mutations do not yet persist them because this
+  template slice does not include a durable access-audit sink. Forks that expose
+  invite/role administration in production must wire those `plan.events` values
+  into an audit table or external audit stream.
 - Generated workflow graph data is emitted as JSON-safe TypeScript constants so
   it can be typechecked with the workflow schemas; consumers must still treat
   React Flow state as a projection, not durable source.
@@ -53,6 +58,10 @@ contract family.
 - Editor sync remains optional. Forks must keep `checkRead` and `checkWrite`
   tied to server-side workspace access before exposing collaborative editing in
   production.
+- Editor sync wraps plain Convex ProseMirror component functions. Access denials
+  are encoded as tagged `EditorSyncAccessDenied` `ConvexError` payloads, but
+  Confect `convexPublic*` wrappers do not currently expose an `error` schema
+  slot for those component functions.
 
 ## Generated Artifact Ownership
 
@@ -103,4 +112,4 @@ Add one row per completed phase or reconciliation gate.
 | 2026-07-04 | G / Task 32 | `rtk host-test-slot --class focused pnpm check:generators`                             | pass, pin-only                                                                                                         |
 | 2026-07-04 | G / Task 34 | `rtk host-test-slot --class full pnpm verify`                                          | pass                                                                                                                   |
 | 2026-07-04 | G / Task 35 | `rtk gh pr checks 6`                                                                   | pass, 9 hosted checks                                                                                                  |
-| 2026-07-04 | G / Task 35 | `rtk headless-bws-env exec bk build view -p mas/maestro-template 81 --no-pager --text` | pass: phase-1 deterministic gates, taste, and contract review                                                          |
+| 2026-07-04 | G / Task 35 | `rtk headless-bws-env exec bk build view -p mas/maestro-template 88 --no-pager --text` | pass: phase-1 deterministic gates, taste, and contract review                                                          |

@@ -9,7 +9,7 @@ describe("maestro-template CLI", () => {
     expect(JSON.parse(result.stdout)).toMatchObject({
       valid: true,
       capabilityCount: 4,
-      headlessOperationCount: 11,
+      headlessOperationCount: 10,
     });
   });
 
@@ -18,10 +18,13 @@ describe("maestro-template CLI", () => {
     const operations = JSON.parse(list.stdout);
     const get = runCli(["operations", "get", "api:brain.pages.createMarkdown"]);
 
-    expect(operations).toHaveLength(11);
+    expect(operations).toHaveLength(10);
     expect(
       operations.map((operation: { id: string }) => operation.id),
     ).toContain("api:brain.pages.createMarkdown");
+    expect(
+      operations.map((operation: { id: string }) => operation.id),
+    ).not.toContain("web:capabilities.sourceGroundedBrief.runInternal");
     expect(
       operations.map((operation: { id: string }) => operation.id),
     ).not.toContain("CLI:createTrustReceipt");
@@ -50,6 +53,7 @@ describe("maestro-template CLI", () => {
         "/api/brain.pages.createMarkdown": {
           post: {
             operationId: "brain.pages.createMarkdown",
+            "x-maestro-auth-scope": "workspace member",
             "x-maestro-typed-errors": [
               "Unauthorized",
               "MemberNotInWorkspace",

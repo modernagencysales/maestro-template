@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import sourceGroundedBrief, {
+  manifest as sourceGroundedBriefManifest,
   SourceGroundedBriefArgs,
   SourceGroundedBriefReturn,
 } from "../confect/capabilities/sourceGroundedBrief.spec";
@@ -126,6 +127,17 @@ describe("sourceGroundedBrief capability contract", () => {
       runtimeAndFunctionType: {
         functionType: "mutation",
       },
+    });
+  });
+
+  it("does not advertise internal workflow steps as web-callable surfaces", () => {
+    const runInternal = sourceGroundedBriefManifest.find(
+      (entry) =>
+        entry.operationId === "capabilities.sourceGroundedBrief.runInternal",
+    );
+
+    expect(runInternal).toMatchObject({
+      surfaces: ["workflow", "internal"],
     });
   });
 

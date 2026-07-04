@@ -62,7 +62,7 @@ describe("template sample data", () => {
         "WorkspaceNotFound",
         "ValidationFailed",
       ],
-      authScope: "unknown",
+      authScope: "workspace member",
     });
   });
 

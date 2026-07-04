@@ -52,6 +52,7 @@ export const buildGeneratedOpenApiDocument = () => ({
           post: {
             operationId: entry.operationId,
             tags: ["template-headless"],
+            "x-maestro-auth-scope": "workspace member",
             "x-maestro-typed-errors": entry.typedErrors,
             requestBody: {
               required: true,

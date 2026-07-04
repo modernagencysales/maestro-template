@@ -9,6 +9,7 @@ import {
 import { roleAtLeast } from "../access/roles";
 import type { DataModel } from "../../convex/_generated/dataModel";
 import { parseEditorTarget } from "./documentTargets";
+import { editorSyncAccessDenied } from "./errors";
 
 export type EditorRole = "viewer" | "editor";
 
@@ -68,12 +69,14 @@ const requireReadableEditorWorkspaceId = async (
   requirePresent(
     await resolveEditorWorkspaceId(ctx, documentId),
     "Editor document target is not readable.",
+    "document-readable",
   );
 
 const loadActiveEditorUser = async (ctx: EditorAuthCtx) => {
   const identity = requirePresent(
     await ctx.auth.getUserIdentity(),
     "Editor sync requires authentication.",
+    "authentication",
   );
   const user = requirePresent(
     await ctx.db
@@ -81,6 +84,7 @@ const loadActiveEditorUser = async (ctx: EditorAuthCtx) => {
       .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
       .unique(),
     "Editor sync requires a provisioned user.",
+    "provisioned-user",
   );
 
   return requireActiveEditorUser(user);
@@ -90,7 +94,10 @@ const requireActiveEditorUser = <User extends { readonly status: string }>(
   user: User,
 ): User => {
   if (user.status !== "active") {
-    throw new Error("Editor sync requires an active user.");
+    throw editorSyncAccessDenied(
+      "active-user",
+      "Editor sync requires an active user.",
+    );
   }
   return user;
 };
@@ -99,11 +106,13 @@ const loadEditorWorkspace = async (ctx: EditorAuthCtx, workspaceId: string) => {
   const workspace = requirePresent(
     ctx.db.normalizeId("workspaces", workspaceId),
     "Editor sync requires an active workspace.",
+    "workspace-membership",
   );
 
   return requirePresent(
     await ctx.db.get(workspace),
     "Editor sync requires an active workspace.",
+    "workspace-membership",
   );
 };
 
@@ -114,11 +123,13 @@ const loadEditorOrganization = async (
   const organization = requirePresent(
     ctx.db.normalizeId("organizations", organizationId),
     "Editor sync requires an active organization.",
+    "workspace-membership",
   );
 
   return requirePresent(
     await ctx.db.get(organization),
     "Editor sync requires an active organization.",
+    "workspace-membership",
   );
 };
 
@@ -179,17 +190,27 @@ const requireResolvedEditorAccess = (
   role: EditorRole,
 ): void => {
   if (!resolution.ok) {
-    throw new Error("Editor sync requires workspace membership.");
+    throw editorSyncAccessDenied(
+      "workspace-membership",
+      "Editor sync requires workspace membership.",
+    );
   }
 
   if (!roleAtLeast(resolution.role, role)) {
-    throw new Error(editorAccessDeniedMessageByRole[role]);
+    throw editorSyncAccessDenied(
+      role === "editor" ? "editor-access" : "workspace-membership",
+      editorAccessDeniedMessageByRole[role],
+    );
   }
 };
 
-const requirePresent = <Value>(value: Value | null, message: string): Value => {
+const requirePresent = <Value>(
+  value: Value | null,
+  message: string,
+  reason: Parameters<typeof editorSyncAccessDenied>[0],
+): Value => {
   if (value === null) {
-    throw new Error(message);
+    throw editorSyncAccessDenied(reason, message);
   }
   return value;
 };

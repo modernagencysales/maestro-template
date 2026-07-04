@@ -17,9 +17,12 @@ describe("workflow headless registry", () => {
     const operations = buildHeadlessOperations();
     const ids = operations.map((operation) => operation.id);
 
-    expect(operations).toHaveLength(11);
+    expect(operations).toHaveLength(10);
     expect(ids).toContain("api:brain.pages.createMarkdown");
     expect(ids).toContain("cli:brain.pages.createMarkdown");
+    expect(ids).not.toContain(
+      "web:capabilities.sourceGroundedBrief.runInternal",
+    );
     expect(ids).not.toContain("CLI:createTrustReceipt");
     expect(ids).not.toContain("api:resolveSourceSet");
     expect(
@@ -35,7 +38,7 @@ describe("workflow headless registry", () => {
       edgeCount: 4,
       capabilityCount: 4,
       agentCount: 3,
-      headlessOperationCount: 11,
+      headlessOperationCount: 10,
     });
   });
 
@@ -115,6 +118,7 @@ describe("workflow headless registry", () => {
       document.paths["/api/brain.pages.createMarkdown"]?.post,
     ).toMatchObject({
       operationId: "brain.pages.createMarkdown",
+      "x-maestro-auth-scope": "workspace member",
       "x-maestro-typed-errors": expect.arrayContaining([
         "Unauthorized",
         "MemberNotInWorkspace",
@@ -127,6 +131,7 @@ describe("workflow headless registry", () => {
 
     expect(createMarkdown).toMatchObject({
       operationId: "brain.pages.createMarkdown",
+      "x-maestro-auth-scope": "workspace member",
       "x-maestro-typed-errors": [
         "Unauthorized",
         "MemberNotInWorkspace",

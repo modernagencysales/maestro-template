@@ -10,6 +10,7 @@ import {
   missingGeneratedRefMapping,
   missingHttpExecutorDispatch,
   missingHttpGeneratedRefMapping,
+  internalNamedOperationsWithClientSurfaces,
   missingMcpGeneratedRefUsage,
   missingRuntimeAdapterDispatch,
   missingTypedErrors,
@@ -62,6 +63,33 @@ describe("check:headless-surface-contract", () => {
           operationId: "web.x",
           surfaces: ["web"],
           typedErrors: ["Unauthorized"],
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("rejects internal-named operations exposed to client-callable surfaces", () => {
+    expect(
+      internalNamedOperationsWithClientSurfaces([
+        {
+          operationId: "capabilities.sourceGroundedBrief.runInternal",
+          surfaces: ["web", "workflow", "internal"],
+          typedErrors: ["ValidationFailed"],
+        },
+      ]),
+    ).toEqual(["capabilities.sourceGroundedBrief.runInternal"]);
+
+    expect(
+      internalNamedOperationsWithClientSurfaces([
+        {
+          operationId: "capabilities.sourceGroundedBrief.runInternal",
+          surfaces: ["workflow", "internal"],
+          typedErrors: ["ValidationFailed"],
+        },
+        {
+          operationId: "capabilities.sourceGroundedBrief.run",
+          surfaces: ["web", "workflow", "internal"],
+          typedErrors: ["ValidationFailed"],
         },
       ]),
     ).toEqual([]);

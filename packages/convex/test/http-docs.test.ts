@@ -78,6 +78,7 @@ describe("template HTTP docs routes", () => {
           post: {
             operationId: "brain.pages.createMarkdown",
             tags: ["template-headless"],
+            "x-maestro-auth-scope": "workspace member",
             "x-maestro-typed-errors": [
               "Unauthorized",
               "MemberNotInWorkspace",

@@ -10,6 +10,9 @@ export const descriptor = descriptorFor("headless-surface-contract");
 const externalSurfaces = ["api", "cli", "mcp"] as const;
 type ExternalSurface = (typeof externalSurfaces)[number];
 
+const clientCallableSurfaces = ["web", ...externalSurfaces] as const;
+type ClientCallableSurface = (typeof clientCallableSurfaces)[number];
+
 type Surface = ExternalSurface | "web" | "workflow" | "internal" | string;
 
 export type HeadlessManifestOperation = {
@@ -51,6 +54,31 @@ export const missingExternalValidationError = (
       (operation) =>
         hasExternalSurface(operation) &&
         !operation.typedErrors.includes("ValidationFailed"),
+    )
+    .map((operation) => operation.operationId);
+
+const hasClientCallableSurface = (
+  operation: HeadlessManifestOperation,
+): boolean =>
+  operation.surfaces.some((surface) =>
+    clientCallableSurfaces.includes(surface as ClientCallableSurface),
+  );
+
+const isInternalNamedOperation = (
+  operation: HeadlessManifestOperation,
+): boolean => {
+  const operationName = operation.operationId.split(".").at(-1) ?? "";
+  return operationName.endsWith("Internal");
+};
+
+export const internalNamedOperationsWithClientSurfaces = (
+  operations: readonly HeadlessManifestOperation[],
+): string[] =>
+  operations
+    .filter(
+      (operation) =>
+        isInternalNamedOperation(operation) &&
+        hasClientCallableSurface(operation),
     )
     .map((operation) => operation.operationId);
 
@@ -256,6 +284,14 @@ export const evaluateHeadlessSurfaceContract = async (
   for (const operationId of missingExternalValidationError(operations)) {
     failures.push(
       `operation ${operationId} is exposed to API/CLI/MCP without declaring ValidationFailed for envelope validation errors`,
+    );
+  }
+
+  for (const operationId of internalNamedOperationsWithClientSurfaces(
+    operations,
+  )) {
+    failures.push(
+      `operation ${operationId} is internally named but exposed to a client-callable surface`,
     );
   }
 

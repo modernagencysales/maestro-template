@@ -57,7 +57,7 @@ export const confectManifest = {
       name: "runInternal",
       operationId: "capabilities.sourceGroundedBrief.runInternal",
       kind: "mutation",
-      surfaces: ["web", "workflow", "internal"],
+      surfaces: ["workflow", "internal"],
       typedErrors: [
         "Unauthorized",
         "Forbidden",
