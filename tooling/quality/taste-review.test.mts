@@ -376,6 +376,41 @@ describe("taste judge calls", () => {
     expect(verdict.verdict).toBe("pass");
     expect(responses).toHaveLength(0);
   });
+
+  it("falls back to OpenAI after repeated malformed OpenRouter verdicts", async () => {
+    stubProviderEnv({
+      OPENROUTER_API_KEY: "openrouter-token",
+      OPENAI_API_KEY: "openai-token",
+    });
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (async (
+      input: string | URL | Request,
+      init?: Parameters<typeof fetch>[1],
+    ) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("openrouter.ai")) {
+        return Response.json({ choices: [{ message: { content: "" } }] });
+      }
+      expect(url).toBe("https://api.openai.com/v1/chat/completions");
+      const body = JSON.parse(String(init?.body)) as { model: string };
+      expect(body.model).toBe("gpt-5.5");
+      return Response.json({
+        choices: [{ message: { content: '{"verdict":"pass","findings":[]}' } }],
+      });
+    }) as typeof fetch);
+
+    const verdict = await callTasteJudge(
+      "packages/example.ts",
+      "export const ok = true;",
+    );
+
+    expect(verdict.verdict).toBe("pass");
+    expect(urls.filter((url) => url.includes("openrouter.ai"))).toHaveLength(3);
+    expect(urls.filter((url) => url.includes("api.openai.com"))).toHaveLength(
+      1,
+    );
+  });
 });
 
 describe("taste review concurrency", () => {

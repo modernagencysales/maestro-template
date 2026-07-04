@@ -332,6 +332,26 @@ export function parseVerdict(raw: string): Verdict {
   };
 }
 
+async function parseJudgeVerdictWithRetries(
+  file: string,
+  callText: () => Promise<string>,
+): Promise<Verdict> {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= MAX_JUDGE_PARSE_ATTEMPTS; attempt += 1) {
+    try {
+      return parseVerdict(await callText());
+    } catch (error) {
+      if (error instanceof TasteInfrastructureError) throw error;
+      lastError = error;
+      if (attempt === MAX_JUDGE_PARSE_ATTEMPTS) break;
+      console.warn(
+        `taste-review: retrying ${file} after malformed judge JSON (${String(attempt)}/${String(MAX_JUDGE_PARSE_ATTEMPTS)})`,
+      );
+    }
+  }
+  throw lastError;
+}
+
 async function callOpenRouter(
   systemPrompt: string,
   userMessage: string,
@@ -489,20 +509,26 @@ export async function callTasteJudge(
   changedLines: readonly ChangedRange[] | null = null,
 ): Promise<Verdict> {
   const userMessage = `File under review: ${file}${changedLinesBlock(changedLines)}\n\n<file-content>\n${content}\n</file-content>`;
-  let lastError: unknown = null;
-  for (let attempt = 1; attempt <= MAX_JUDGE_PARSE_ATTEMPTS; attempt += 1) {
-    try {
-      return parseVerdict(await callJudgeText(userMessage));
-    } catch (error) {
-      if (error instanceof TasteInfrastructureError) throw error;
-      lastError = error;
-      if (attempt === MAX_JUDGE_PARSE_ATTEMPTS) break;
+  try {
+    return await parseJudgeVerdictWithRetries(file, () =>
+      callJudgeText(userMessage),
+    );
+  } catch (error) {
+    const provider = requireProvider();
+    if (
+      !(error instanceof TasteInfrastructureError) &&
+      provider.kind === "openrouter" &&
+      process.env.OPENAI_API_KEY
+    ) {
       console.warn(
-        `taste-review: retrying ${file} after malformed judge JSON (${String(attempt)}/${String(MAX_JUDGE_PARSE_ATTEMPTS)})`,
+        `taste-review: OpenRouter returned malformed judge JSON for ${file}; falling back to OpenAI.`,
+      );
+      return parseJudgeVerdictWithRetries(file, () =>
+        callOpenAI(RUBRIC, userMessage),
       );
     }
+    throw error;
   }
-  throw lastError;
 }
 
 function printFindings(file: string, verdict: Verdict): void {
