@@ -429,6 +429,18 @@ export const checkDescriptors = {
         includes: ["capabilities", "brain", "jobs", "workpool"],
         message: "generated Confect spec must include core template groups",
       },
+      {
+        file: "tooling/quality/check-confect-contracts.mts",
+        includes: [
+          "publicSpecMissingError",
+          "ambientDateNow",
+          "plainConvexValueImports",
+          "requiredGeneratedFilesMissing",
+          "collectConfectContractFindings",
+        ],
+        message:
+          "Confect contract gate must keep semantic contract scanners wired",
+      },
     ],
   },
   "confect-compat": {
