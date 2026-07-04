@@ -1,0 +1,98 @@
+import { FunctionSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { type Role } from "../../access/roles";
+import { WorkspaceReadErrors, WorkspaceWriteErrors } from "./errors";
+import {
+  type HeadlessSurface,
+  exposeSurfaces,
+  type SurfacePolicy,
+} from "./surfaces";
+
+export type CapabilityKind = "query" | "mutation" | "action";
+
+export interface CapabilityMeta {
+  readonly name: string;
+  readonly kind: CapabilityKind;
+  readonly minimumRole: Role;
+  readonly surfaces: SurfacePolicy;
+  readonly headless: readonly HeadlessSurface[];
+  readonly idempotent: boolean;
+}
+
+export interface CapabilityMetaInput {
+  readonly name: string;
+  readonly kind: CapabilityKind;
+  readonly minimumRole: Role;
+  readonly surfaces?: SurfacePolicy;
+  readonly headless?: readonly HeadlessSurface[];
+  readonly idempotent?: boolean;
+}
+
+export const capabilityMeta = (input: CapabilityMetaInput): CapabilityMeta => {
+  const headless = input.headless ?? [];
+
+  return {
+    name: input.name,
+    kind: input.kind,
+    minimumRole: input.minimumRole,
+    headless,
+    surfaces: input.surfaces ?? exposeSurfaces(headless),
+    idempotent: input.idempotent ?? input.kind === "query",
+  };
+};
+
+export function publicErrorForKind(kind: "query"): typeof WorkspaceReadErrors;
+export function publicErrorForKind(
+  kind: "mutation" | "action",
+): typeof WorkspaceWriteErrors;
+export function publicErrorForKind(kind: CapabilityKind) {
+  return kind === "query" ? WorkspaceReadErrors : WorkspaceWriteErrors;
+}
+
+type SchemaThunk<T extends Schema.Schema.AnyNoContext> = () => T;
+
+interface FunctionSpecInput<
+  Name extends string,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
+> {
+  readonly name: Name;
+  readonly args: SchemaThunk<Args>;
+  readonly returns: SchemaThunk<Returns>;
+}
+
+export const publicQuery = <
+  const Name extends string,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
+>(
+  input: FunctionSpecInput<Name, Args, Returns>,
+) =>
+  FunctionSpec.publicQuery({
+    ...input,
+    error: () => publicErrorForKind("query"),
+  });
+
+export const publicMutation = <
+  const Name extends string,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
+>(
+  input: FunctionSpecInput<Name, Args, Returns>,
+) =>
+  FunctionSpec.publicMutation({
+    ...input,
+    error: () => publicErrorForKind("mutation"),
+  });
+
+export const internalMutationStep = <
+  const Name extends string,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
+>(
+  input: FunctionSpecInput<Name, Args, Returns>,
+) =>
+  FunctionSpec.internalMutation({
+    ...input,
+    error: () => publicErrorForKind("mutation"),
+  });
