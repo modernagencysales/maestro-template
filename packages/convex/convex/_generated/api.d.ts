@@ -81,6 +81,7 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
+  posthog: import("@posthog/convex/_generated/component.js").ComponentApi<"posthog">;
   workpool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">;
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;

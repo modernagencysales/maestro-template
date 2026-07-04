@@ -584,8 +584,104 @@ export const checkDescriptors = {
     requirements: [
       {
         file: "docs/template/integrations.md",
-        includes: ["PostHog", "Analytics"],
-        message: "integrations docs must include PostHog readiness",
+        includes: [
+          "PostHog backend capture covers Confect mutation and action failures only",
+          "functionPath",
+          "kind",
+          "public error tag",
+          "redacted public message",
+          "stable cause hash",
+          "Query capture is not included",
+        ],
+        message:
+          "integrations docs must define PostHog backend Confect failure capture and query limitation",
+      },
+      {
+        file: "docs/template/env-manifest.md",
+        includes: [
+          "POSTHOG_PROJECT_TOKEN",
+          "phc_test_placeholder",
+          "POSTHOG_HOST=http://localhost",
+          "local checks never require live credentials",
+        ],
+        message:
+          "env manifest must document fake/test PostHog placeholders without live credentials",
+      },
+      {
+        file: "docs/template/confect-effect-guide.md",
+        includes: [
+          'withMutationErrorCapture("brain/pages.createMarkdown", effect)',
+          'withActionErrorCapture("group/functionName", effect)',
+          "preserves and",
+          "re-fails the original cause",
+          "There is no `withQueryErrorCapture` helper",
+        ],
+        message:
+          "Confect guide must document PostHog error-capture wrapper usage and limitations",
+      },
+      {
+        file: "docs/template/effectification-status.md",
+        includes: [
+          "brain/pages.createMarkdown",
+          "Remaining Confect groups are still unwrapped pending rollout/factory support",
+        ],
+        message:
+          "effectification status must identify the first wrapped group and remaining rollout gap",
+      },
+      {
+        file: "tooling/effectified-api-proof/posthog-proof.ts",
+        includes: [
+          'import { PostHog } from "@posthog/convex"',
+          "new PostHog(component)",
+          "posthog.capture",
+          "template.proof",
+        ],
+        message:
+          "PostHog API proof must exercise constructor and capture shape",
+      },
+      {
+        file: "packages/convex/convex/convex.config.ts",
+        includes: [
+          'import posthog from "@posthog/convex/convex.config.js"',
+          "POSTHOG_PROJECT_TOKEN: v.string()",
+          "POSTHOG_HOST: v.optional(v.string())",
+          "app.use(posthog",
+        ],
+        message:
+          "Convex config must mount the PostHog component with token and optional host env",
+      },
+      {
+        file: "packages/observability/src/index.ts",
+        includes: [
+          "CapturedConfectFailure",
+          "template.confect.failure",
+          "functionPath",
+          "kind",
+          "errorTag",
+          "errorMessage",
+          "causeHash",
+          "redactObservabilityPayload",
+        ],
+        message:
+          "observability package must expose the redacted Confect failure event contract",
+      },
+      {
+        file: "packages/convex/confect/observability/errorCapture.ts",
+        includes: [
+          "withMutationErrorCapture",
+          "withActionErrorCapture",
+          "Effect.catchAllCause",
+          "Effect.catchAll(() => Effect.void)",
+          "Effect.failCause(cause)",
+        ],
+        message:
+          "Confect error-capture wrappers must best-effort capture and preserve the original cause",
+      },
+      {
+        file: "packages/convex/confect/brain/pages.impl.ts",
+        includes: ["withMutationErrorCapture", "brain/pages.createMarkdown"],
+        message:
+          "brain/pages.createMarkdown must be the first wrapped Confect mutation",
       },
     ],
   },

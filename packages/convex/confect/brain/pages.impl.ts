@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
+import { withMutationErrorCapture } from "../observability/errorCapture";
 import pages from "./pages.spec";
 
 const withConfectClock = <A, E, R>(
@@ -34,22 +35,25 @@ const createMarkdown = FunctionImpl.make(
   pages,
   "createMarkdown",
   ({ workspaceId, slug, title, markdown }) =>
-    Effect.gen(function* () {
-      yield* withConfectClock(requireWorkspaceAccess(workspaceId, "editor"));
-      const updatedAt = yield* withConfectClock(Clock.currentTimeMillis);
-      const writer = yield* DatabaseWriter;
-      return yield* writer
-        .table("brainPages")
-        .insert({
-          workspaceId,
-          slug,
-          title,
-          markdown,
-          sourceKind: "markdown",
-          updatedAt,
-        })
-        .pipe(Effect.orDie);
-    }),
+    withMutationErrorCapture(
+      "brain/pages.createMarkdown",
+      Effect.gen(function* () {
+        yield* withConfectClock(requireWorkspaceAccess(workspaceId, "editor"));
+        const updatedAt = yield* withConfectClock(Clock.currentTimeMillis);
+        const writer = yield* DatabaseWriter;
+        return yield* writer
+          .table("brainPages")
+          .insert({
+            workspaceId,
+            slug,
+            title,
+            markdown,
+            sourceKind: "markdown",
+            updatedAt,
+          })
+          .pipe(Effect.orDie);
+      }),
+    ),
 );
 
 export default GroupImpl.make(databaseSchema, pages).pipe(

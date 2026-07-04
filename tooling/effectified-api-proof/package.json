@@ -10,6 +10,7 @@
     "@confect/server": "9.1.5",
     "@confect/test": "9.1.5",
     "@convex-dev/workflow": "0.4.4",
+    "@posthog/convex": "2.0.32",
     "convex": "1.42.1",
     "effect": "3.21.4"
   },

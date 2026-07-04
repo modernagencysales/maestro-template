@@ -1,10 +1,23 @@
 import migrations from "@convex-dev/migrations/convex.config";
 import workflow from "@convex-dev/workflow/convex.config";
 import workpool from "@convex-dev/workpool/convex.config";
+import posthog from "@posthog/convex/convex.config.js";
 import { defineApp } from "convex/server";
+import { v } from "convex/values";
 
-const app = defineApp();
+const app = defineApp({
+  env: {
+    POSTHOG_PROJECT_TOKEN: v.string(),
+    POSTHOG_HOST: v.optional(v.string()),
+  },
+});
 
+app.use(posthog, {
+  env: {
+    POSTHOG_PROJECT_TOKEN: app.env.POSTHOG_PROJECT_TOKEN,
+    POSTHOG_HOST: app.env.POSTHOG_HOST,
+  },
+});
 app.use(workpool, { name: "workpool" });
 app.use(workflow, { name: "workflow" });
 app.use(migrations, { name: "migrations" });

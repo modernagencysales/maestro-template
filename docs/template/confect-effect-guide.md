@@ -67,6 +67,27 @@ without duplicating headless registry metadata.
   context. Cover Dates, branded ids, unions, nullable fields, transforms, and
   arrays with compile-time and runtime schema tests.
 
+## PostHog Failure Capture
+
+Confect mutation and action implementations that own meaningful write or side
+effect paths can add backend failure telemetry around their Effect program:
+
+```ts
+withMutationErrorCapture("brain/pages.createMarkdown", effect);
+withActionErrorCapture("group/functionName", effect);
+```
+
+The first argument is the stable Confect function path. The wrapper reads the
+Confect `MutationCtx` or `ActionCtx`, converts the Effect `Cause` into a
+redacted event with `functionPath`, `kind`, public error tag, redacted message,
+and cause hash, then attempts PostHog capture through the Convex component.
+Capture is best-effort: if PostHog capture fails, the wrapper preserves and
+re-fails the original cause.
+
+There is no `withQueryErrorCapture` helper in this slice. Query contexts do not
+expose the scheduler required by the PostHog Convex component, so query failure
+telemetry needs a separate future durable event path.
+
 ## Client Rules
 
 - Web uses `@confect/react` generated refs.

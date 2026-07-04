@@ -23,6 +23,8 @@ contract family.
 
 - `brain/pages` declares only `WorkspaceNotFound` and does not enforce active
   workspace membership before reads or writes.
+- The first PostHog-wrapped Confect group is `brain/pages.createMarkdown`.
+  Remaining Confect groups are still unwrapped pending rollout/factory support.
 - Headless API/CLI/MCP projections still derive from the canned
   `templateRegistry`, not generated Confect contract metadata.
 - Generator draft and promotion output disagree on layout and still emit some

@@ -223,12 +223,18 @@ importers:
       "@effect/vitest":
         specifier: 0.29.0
         version: 0.29.0(effect@3.21.4)(vitest@3.2.6(@types/node@22.20.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
+      "@maestro-template/observability":
+        specifier: workspace:*
+        version: link:../observability
       "@maestro-template/template-core":
         specifier: workspace:*
         version: link:../template-core
       "@maestro-template/workflow-tooling":
         specifier: workspace:*
         version: link:../../tooling/workflow
+      "@posthog/convex":
+        specifier: 2.0.32
+        version: 2.0.32(convex@1.42.1(react@19.1.0))(rxjs@7.8.2)
       convex:
         specifier: 1.42.1
         version: 1.42.1(react@19.1.0)
@@ -337,6 +343,9 @@ importers:
       "@convex-dev/workflow":
         specifier: 0.4.4
         version: 0.4.4(@convex-dev/workpool@0.4.7(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.1.0)))(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.1.0))(react@19.1.0)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.1.0))
+      "@posthog/convex":
+        specifier: 2.0.32
+        version: 2.0.32(convex@1.42.1(react@19.1.0))(rxjs@7.8.2)
       convex:
         specifier: 1.42.1
         version: 1.42.1(react@19.1.0)
@@ -2722,6 +2731,26 @@ packages:
       }
     engines: { node: ">=18" }
     hasBin: true
+
+  "@posthog/convex@2.0.32":
+    resolution:
+      {
+        integrity: sha512-diYqpk0XRDA9g3Yu2f+3VS6nsj+OR0EQglh+urC3KkbrNiL+yoDZs1sWiFRx9aEJlwjN0nbHLVJqxkaW838syg==,
+      }
+    peerDependencies:
+      convex: ^1.39.0
+
+  "@posthog/core@1.39.6":
+    resolution:
+      {
+        integrity: sha512-o6ajIwN5zXoNP0D4H/QPmOyibNTUkSyOR6ya7AG5U2ywXx4awo72L2KnCoiZPQM5x/bXv6jPBdimH8M18Ax0aw==,
+      }
+
+  "@posthog/types@1.392.1":
+    resolution:
+      {
+        integrity: sha512-Qg6Gl7/1vlr8+gPtBi5gwnLgAgiyFoKOVmTvTtDcvya9cpTwZfna7rQmkGQ4B63CunUYNNbOlqcwiUwUDyTK6w==,
+      }
 
   "@radix-ui/number@1.1.1":
     resolution:
@@ -7138,6 +7167,18 @@ packages:
       }
     engines: { node: ^10 || ^12 || >=14 }
 
+  posthog-node@5.39.4:
+    resolution:
+      {
+        integrity: sha512-+fCQ7htBFRQQFbIzl1T0TA7bDwYyaB9XP308ZFMCUoB5LzTzOFxBa6TYVrxdH/VQl43WXTp6sf0QsG2Z4XlNBg==,
+      }
+    engines: { node: ^20.20.0 || >=22.22.0 }
+    peerDependencies:
+      rxjs: ^7.0.0
+    peerDependenciesMeta:
+      rxjs:
+        optional: true
+
   prelude-ls@1.2.1:
     resolution:
       {
@@ -9706,6 +9747,20 @@ snapshots:
   "@playwright/test@1.61.1":
     dependencies:
       playwright: 1.61.1
+
+  "@posthog/convex@2.0.32(convex@1.42.1(react@19.1.0))(rxjs@7.8.2)":
+    dependencies:
+      "@posthog/core": 1.39.6
+      convex: 1.42.1(react@19.1.0)
+      posthog-node: 5.39.4(rxjs@7.8.2)
+    transitivePeerDependencies:
+      - rxjs
+
+  "@posthog/core@1.39.6":
+    dependencies:
+      "@posthog/types": 1.392.1
+
+  "@posthog/types@1.392.1": {}
 
   "@radix-ui/number@1.1.1": {}
 
@@ -12631,6 +12686,12 @@ snapshots:
       nanoid: 3.3.15
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  posthog-node@5.39.4(rxjs@7.8.2):
+    dependencies:
+      "@posthog/core": 1.39.6
+    optionalDependencies:
+      rxjs: 7.8.2
 
   prelude-ls@1.2.1: {}
 
