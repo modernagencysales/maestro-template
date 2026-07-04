@@ -67,10 +67,10 @@ describe("workflow headless registry", () => {
     expect(buildMcpTools()).toContainEqual({
       name: "template.brain.pages.createMarkdown",
       description:
-        "Invoke brain.pages.createMarkdown through the generated manifest.",
+        "Invoke brain.pages.createMarkdown through the generated Confect contract manifest.",
       inputSchema: expect.objectContaining({
         type: "object",
-        additionalProperties: false,
+        additionalProperties: true,
       }),
       typedErrors: [
         "Unauthorized",
@@ -94,7 +94,6 @@ describe("workflow headless registry", () => {
       document.paths["/api/brain.pages.createMarkdown"]?.post,
     ).toMatchObject({
       operationId: "brain.pages.createMarkdown",
-      "x-maestro-auth-scope": "workspace member",
       "x-maestro-typed-errors": expect.arrayContaining([
         "Unauthorized",
         "MemberNotInWorkspace",
@@ -106,13 +105,22 @@ describe("workflow headless registry", () => {
 
     expect(createMarkdown).toMatchObject({
       operationId: "brain.pages.createMarkdown",
-      "x-maestro-auth-scope": "workspace member",
       "x-maestro-typed-errors": [
         "Unauthorized",
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
       ],
-      security: [{ bearerAuth: ["workspace member"] }],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              additionalProperties: true,
+            },
+          },
+        },
+      },
     });
 
     if (!createMarkdown) {
@@ -121,23 +129,12 @@ describe("workflow headless registry", () => {
       );
     }
 
-    const typedErrorResponse = createMarkdown.responses["400"];
-
-    if (!typedErrorResponse) {
-      throw new Error(
-        "brain.pages.createMarkdown typed error response is missing",
-      );
-    }
-
-    const typedErrorEnum =
-      typedErrorResponse.content["application/json"].schema.properties?.error
-        ?.properties?._tag?.enum;
-
-    expect(typedErrorEnum).toEqual([
-      "Unauthorized",
-      "MemberNotInWorkspace",
-      "WorkspaceNotFound",
-    ]);
+    expect(createMarkdown.responses["200"]).toEqual({
+      description: "Typed operation result.",
+    });
+    expect(createMarkdown.responses["400"]).toEqual({
+      description: "Declared typed failure.",
+    });
   });
 
   it("returns a deterministic run receipt for the template workflow", () => {

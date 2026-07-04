@@ -76,20 +76,14 @@ export type OpenApiDocument = {
     {
       readonly post: {
         readonly operationId: string;
-        readonly summary: string;
-        readonly description: string;
         readonly tags: readonly string[];
-        readonly security: readonly {
-          readonly bearerAuth: readonly string[];
-        }[];
-        readonly "x-maestro-auth-scope": string;
+        readonly "x-maestro-auth-scope"?: string;
         readonly "x-maestro-typed-errors": readonly string[];
         readonly requestBody: {
           readonly required: true;
           readonly content: {
             readonly "application/json": {
               readonly schema: JsonSchema;
-              readonly example: Record<string, unknown>;
             };
           };
         };
@@ -97,29 +91,11 @@ export type OpenApiDocument = {
           string,
           {
             readonly description: string;
-            readonly content: {
-              readonly "application/json": {
-                readonly schema: JsonSchema;
-                readonly examples?: Record<
-                  string,
-                  { readonly value: Record<string, unknown> }
-                >;
-              };
-            };
           }
         >;
       };
     }
   >;
-  readonly components: {
-    readonly securitySchemes: {
-      readonly bearerAuth: {
-        readonly type: "http";
-        readonly scheme: "bearer";
-      };
-    };
-    readonly schemas: Record<string, JsonSchema>;
-  };
 };
 
 export type McpToolEntry = {
@@ -187,192 +163,55 @@ export const buildApiCatalog = (
       typedErrors: entry.typedErrors,
     }));
 
-const baseRequestSchema: JsonSchema = {
+const objectSchema: JsonSchema = {
   type: "object",
-  additionalProperties: false,
-  required: ["workspaceSlug", "input"],
-  properties: {
-    workspaceSlug: {
-      type: "string",
-      description: "Server-authorized workspace slug or instance alias.",
-    },
-    input: {
-      type: "object",
-      description:
-        "Capability-specific input. Generated Confect refs provide the exact Effect schema in the implementation package.",
-      additionalProperties: true,
-    },
-    idempotencyKey: {
-      type: "string",
-      description: "Required for externally visible writes.",
-    },
-  },
+  additionalProperties: true,
 };
 
-const successResponseSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["ok", "operationId", "result"],
-  properties: {
-    ok: { type: "boolean" },
-    operationId: { type: "string" },
-    result: {
-      type: "object",
-      description:
-        "Typed capability result encoded by the generated Confect function.",
-      additionalProperties: true,
-    },
-  },
-};
-
-const typedErrorSchema = (typedErrors: readonly string[]): JsonSchema => ({
-  type: "object",
-  additionalProperties: false,
-  required: ["ok", "error"],
-  properties: {
-    ok: { type: "boolean" },
-    error: {
-      type: "object",
-      additionalProperties: false,
-      required: ["_tag", "message"],
-      properties: {
-        _tag: {
-          type: "string",
-          enum: typedErrors,
-          description: "Declared public typed error variant.",
-        },
-        message: {
-          type: "string",
-          description: "Redacted user-safe error message.",
-        },
-      },
-    },
-  },
-});
-
-const mcpInputSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    workspaceSlug: {
-      type: "string",
-      description: "Reviewer-safe workspace slug. Defaults to acme-demo.",
-    },
-  },
-};
-
-const apiExampleFor = (
-  entry: ApiCatalogEntry,
-): {
-  readonly request: Record<string, unknown>;
-  readonly success: Record<string, unknown>;
-  readonly typedError: Record<string, unknown>;
-} => ({
-  request: {
-    workspaceSlug: "acme-demo",
-    input: {
-      sample: entry.operationId,
-    },
-    idempotencyKey: `${entry.operationId}-example-001`,
-  },
-  success: {
-    ok: true,
-    operationId: entry.operationId,
-    result: {
-      status: "accepted",
-      id: "generated_result_example",
-    },
-  },
-  typedError: {
-    ok: false,
-    error: {
-      _tag: entry.typedErrors[0] ?? "ValidationFailed",
-      message: "Request failed a declared template policy check.",
-    },
-  },
-});
-
-export const buildOpenApiDocument = (
-  registry: TemplateRegistry = templateRegistry,
+export const buildGeneratedOpenApiDocument = (
+  _registry: TemplateRegistry = templateRegistry,
 ): OpenApiDocument => {
-  const apiEntries = buildApiCatalog(registry);
-
   return {
     openapi: "3.1.0",
     info: {
       title: "Maestro Template Headless API",
       version: "0.1.0",
-      description:
-        "Generated from the Confect manifest. The live Confect HTTP implementation mounts the same operations for Scalar.",
+      description: "Generated from Confect contract manifest metadata.",
     },
     paths: Object.fromEntries(
-      apiEntries.map((entry) => {
-        const examples = apiExampleFor(entry);
-
-        return [
-          entry.path,
+      confectManifest.functions
+        .filter((entry) => hasSurface(entry, "api"))
+        .map((entry) => [
+          `/api/${entry.operationId}`,
           {
             post: {
               operationId: entry.operationId,
-              summary: `Run ${entry.operationId}`,
-              description:
-                "Calls the same typed capability/workflow contract used by the web, CLI, and MCP surfaces.",
               tags: ["template-headless"],
-              security: [{ bearerAuth: [entry.authScope] }],
-              "x-maestro-auth-scope": entry.authScope,
               "x-maestro-typed-errors": entry.typedErrors,
               requestBody: {
                 required: true,
                 content: {
                   "application/json": {
-                    schema: baseRequestSchema,
-                    example: examples.request,
+                    schema: objectSchema,
                   },
                 },
               },
               responses: {
                 "200": {
-                  description: "Typed capability result.",
-                  content: {
-                    "application/json": {
-                      schema: successResponseSchema,
-                      examples: {
-                        success: { value: examples.success },
-                      },
-                    },
-                  },
+                  description: "Typed operation result.",
                 },
                 "400": {
                   description: "Declared typed failure.",
-                  content: {
-                    "application/json": {
-                      schema: typedErrorSchema(entry.typedErrors),
-                      examples: {
-                        typedError: { value: examples.typedError },
-                      },
-                    },
-                  },
                 },
               },
             },
           },
-        ];
-      }),
+        ]),
     ),
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-        },
-      },
-      schemas: {
-        TemplateOperationRequest: baseRequestSchema,
-        TemplateOperationSuccess: successResponseSchema,
-      },
-    },
   };
 };
+
+export const buildOpenApiDocument = buildGeneratedOpenApiDocument;
 
 export const runTemplateApiOperation = (
   operationId: string,
@@ -432,25 +271,24 @@ export const runTemplateApiOperation = (
   };
 };
 
-export const buildMcpTools = (
+export const buildGeneratedMcpTools = (
   _registry: TemplateRegistry = templateRegistry,
-): readonly McpToolEntry[] => [
-  ...buildHeadlessOperations()
-    .filter((operation) => operation.surface === "mcp")
-    .map((operation) => ({
-      name: `template.${operation.capability}`,
-      description: `Invoke ${operation.capability} through the generated manifest.`,
+): readonly McpToolEntry[] =>
+  confectManifest.functions
+    .filter((entry) => hasSurface(entry, "mcp"))
+    .map((entry) => ({
+      name: `template.${entry.operationId}`,
+      description: `Invoke ${entry.operationId} through the generated Confect contract manifest.`,
       inputSchema: mcpInputSchema,
-      typedErrors: operation.typedErrors,
-    })),
-  {
-    name: "template.workflow.run",
-    description:
-      "Run the deterministic reviewer-safe workflow through the shared template registry.",
-    inputSchema: mcpInputSchema,
-    typedErrors: ["Unauthorized", "ValidationFailed"],
-  },
-];
+      typedErrors: entry.typedErrors,
+    }));
+
+const mcpInputSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: true,
+};
+
+export const buildMcpTools = buildGeneratedMcpTools;
 
 export const runTemplateWorkflow = (
   registry: TemplateRegistry = templateRegistry,

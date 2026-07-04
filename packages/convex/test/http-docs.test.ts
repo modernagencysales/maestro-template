@@ -76,7 +76,22 @@ describe("template HTTP docs routes", () => {
         "/api/brain.pages.createMarkdown": {
           post: {
             operationId: "brain.pages.createMarkdown",
-            "x-maestro-auth-scope": "workspace member",
+            tags: ["template-headless"],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    additionalProperties: true,
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": { description: "Typed operation result." },
+              "400": { description: "Declared typed failure." },
+            },
           },
         },
       },

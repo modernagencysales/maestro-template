@@ -50,12 +50,22 @@ describe("maestro-template CLI", () => {
         "/api/brain.pages.createMarkdown": {
           post: {
             operationId: "brain.pages.createMarkdown",
-            "x-maestro-auth-scope": "workspace member",
             "x-maestro-typed-errors": [
               "Unauthorized",
               "MemberNotInWorkspace",
               "WorkspaceNotFound",
             ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    additionalProperties: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

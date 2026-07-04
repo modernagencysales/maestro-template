@@ -1,4 +1,3 @@
-import { buildOpenApiDocument } from "@maestro-template/workflow-tooling";
 import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";
 import { httpActionGeneric, httpRouter } from "convex/server";
 import { api } from "../convex/_generated/api";
@@ -7,6 +6,7 @@ import {
   type HeadlessExecutorRequest,
   type JsonValue,
 } from "./manifest/executor";
+import { buildGeneratedOpenApiDocument } from "./manifest/openapi";
 
 type ManifestFunction = (typeof confectManifest.functions)[number];
 
@@ -280,7 +280,7 @@ export const handleTemplateHttpRequest = async (
       });
     }
 
-    return jsonResponse(buildOpenApiDocument());
+    return jsonResponse(buildGeneratedOpenApiDocument());
   }
 
   if (url.pathname === "/api/docs") {
