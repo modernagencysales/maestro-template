@@ -743,6 +743,8 @@ describe("template app factory generators", () => {
     expect(promoted.files.map((file) => file.path)).toEqual([
       "packages/convex/confect/capabilities/summarizeSource.spec.ts",
       "packages/convex/confect/capabilities/summarizeSource.impl.ts",
+      "packages/convex/confect/capabilities/summarizeSource.domain.ts",
+      "packages/convex/confect/capabilities/summarizeSource.test.ts",
       "packages/convex/confect/capabilities/summarizeSource.headless.json",
       "docs/template/generated/capabilities/summarizeSource.md",
     ]);
@@ -753,7 +755,12 @@ describe("template app factory generators", () => {
     expect(promoted.files[1]?.content).toContain(
       'import databaseSchema from "../_generated/schema"',
     );
-    expect(JSON.parse(promoted.files[2]?.content ?? "{}")).toMatchObject({
+    expect(promoted.files[2]?.content).toContain(
+      "normalizeSummarizeSourceInput",
+    );
+    expect(promoted.files[3]?.content).toContain('import fc from "fast-check"');
+    expect(promoted.files[3]?.content).toContain("fc.assert");
+    expect(JSON.parse(promoted.files[4]?.content ?? "{}")).toMatchObject({
       migrationNotes: expect.arrayContaining([
         "Run Confect codegen before wiring generated refs.",
       ]),
