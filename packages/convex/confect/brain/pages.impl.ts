@@ -77,18 +77,14 @@ const recordSnapshotInternal = FunctionImpl.make(
         .pipe(Effect.orDie);
 
       if (page === null) {
-        return yield* Effect.fail(
-          new NotFound({ resource: "brainPages", id: pageId }),
-        );
+        return yield* new NotFound({ resource: "brainPages", id: pageId });
       }
 
       if (page.workspaceId !== workspaceId) {
-        return yield* Effect.fail(
-          new ValidationFailed({
-            field: "workspaceId",
-            message: "Brain page does not belong to workspace.",
-          }),
-        );
+        return yield* new ValidationFailed({
+          field: "workspaceId",
+          message: "Brain page does not belong to workspace.",
+        });
       }
 
       const updatedAt = yield* unsafeAssumeClockProvided(

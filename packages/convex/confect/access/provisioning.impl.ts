@@ -7,21 +7,16 @@ import * as Option from "effect/Option";
 
 import databaseSchema from "../_generated/schema";
 import { Auth, DatabaseReader, DatabaseWriter } from "../_generated/services";
-import { ProvisioningConflict, Unauthorized } from "../errors";
+import { Unauthorized } from "../errors";
+import { asGenericId } from "./handlerContext";
 import provisioning from "./provisioning.spec";
 import {
   buildProvisioningPlan,
   extractIdentityProfile,
-  type IdentityProfile,
-  type OrganizationMembershipProvisioningRow,
+  requireInsertValue,
   selectLiveOwnedOrganization,
   selectLiveOwnedWorkspace,
-  type OrganizationProvisioningRow,
-  type ProvisioningPlan,
-  type RowPlan,
   type UserProvisioningRow,
-  type WorkspaceMembershipProvisioningRow,
-  type WorkspaceProvisioningRow,
 } from "./provisioning";
 
 const ensureProvisioned = FunctionImpl.make(
@@ -30,21 +25,106 @@ const ensureProvisioned = FunctionImpl.make(
   "ensureProvisioned",
   () =>
     Effect.gen(function* () {
-      const identity = yield* readIdentityProfile();
+      const auth = yield* Auth;
+      const identity = yield* extractIdentityProfile(
+        yield* auth.getUserIdentity.pipe(
+          Effect.mapError(() => new Unauthorized()),
+        ),
+      );
       const now = yield* Clock.currentTimeMillis;
 
-      const existingUser = yield* readProvisioningUser(identity.subject);
-      const userId = yield* provisionUser({ identity, existingUser, now });
-      const { existingOrganization, existingWorkspace } =
-        yield* readOwnedWorkspaceState(userId);
-      const { organizationMembership, workspaceMembership } =
-        yield* readMembershipState({
-          userId,
-          existingOrganization,
-          existingWorkspace,
-        });
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
 
-      const plan = buildProvisioningPlan({
+      const existingUser = yield* reader
+        .table("users")
+        .index("by_subject", (q) => q.eq("subject", identity.subject))
+        .first()
+        .pipe(
+          Effect.map(Option.getOrNull),
+          Effect.map((user) =>
+            user === null ? null : toProvisioningUser(user),
+          ),
+          Effect.orDie,
+        );
+
+      const userPlan = (yield* buildProvisioningPlan({
+        identity,
+        state: {
+          user: existingUser,
+          liveOrganization: null,
+          liveWorkspace: null,
+          organizationMembership: null,
+          workspaceMembership: null,
+        },
+        now,
+      })).user;
+
+      const userId: GenericId<"users"> =
+        existingUser === null
+          ? yield* writer
+              .table("users")
+              .insert(requireInsertValue(userPlan, "user"))
+              .pipe(Effect.orDie)
+          : asGenericId<"users">(existingUser._id);
+
+      if (existingUser !== null && userPlan.action === "patch") {
+        yield* writer
+          .table("users")
+          .patch(asGenericId<"users">(existingUser._id), userPlan.value)
+          .pipe(Effect.orDie);
+      }
+
+      const organizations = yield* reader
+        .table("organizations")
+        .index("by_owner", (q) => q.eq("ownerUserId", userId))
+        .take(100)
+        .pipe(Effect.orDie);
+      const existingOrganization = yield* selectLiveOwnedOrganization(
+        organizations,
+        userId,
+      );
+
+      const workspaces =
+        existingOrganization === null
+          ? []
+          : yield* reader
+              .table("workspaces")
+              .index("by_organization", (q) =>
+                q.eq("organizationId", existingOrganization._id),
+              )
+              .take(100)
+              .pipe(Effect.orDie);
+      const existingWorkspace = yield* selectLiveOwnedWorkspace(
+        workspaces,
+        userId,
+      );
+
+      const organizationMembership =
+        existingOrganization === null
+          ? null
+          : yield* reader
+              .table("organizationMembers")
+              .index("by_organization_user", (q) =>
+                q
+                  .eq("organizationId", existingOrganization._id)
+                  .eq("userId", userId),
+              )
+              .first()
+              .pipe(Effect.map(Option.getOrNull), Effect.orDie);
+
+      const workspaceMembership =
+        existingWorkspace === null
+          ? null
+          : yield* reader
+              .table("workspaceMembers")
+              .index("by_workspace_user", (q) =>
+                q.eq("workspaceId", existingWorkspace._id).eq("userId", userId),
+              )
+              .first()
+              .pipe(Effect.map(Option.getOrNull), Effect.orDie);
+
+      const plan = yield* buildProvisioningPlan({
         identity,
         state: {
           user: existingUser,
@@ -56,290 +136,81 @@ const ensureProvisioned = FunctionImpl.make(
         now,
       });
 
-      const organizationId = yield* provisionOrganization({
-        plan,
-        existingOrganization,
-        userId,
-      });
-      const workspaceId = yield* provisionWorkspace({
-        plan,
-        existingWorkspace,
-        organizationId,
-        userId,
-      });
-      yield* provisionMemberships({
-        plan,
-        organizationMembership,
-        organizationId,
-        workspaceMembership,
-        workspaceId,
-        userId,
-      });
+      const organizationId: GenericId<"organizations"> =
+        existingOrganization === null
+          ? yield* writer
+              .table("organizations")
+              .insert({
+                ...requireInsertValue(plan.organization, "organization"),
+                ownerUserId: userId,
+              })
+              .pipe(Effect.orDie)
+          : asGenericId<"organizations">(existingOrganization._id);
+
+      const workspaceId: GenericId<"workspaces"> =
+        existingWorkspace === null
+          ? yield* writer
+              .table("workspaces")
+              .insert({
+                ...requireInsertValue(plan.workspace, "workspace"),
+                organizationId,
+                ownerUserId: userId,
+              })
+              .pipe(Effect.orDie)
+          : asGenericId<"workspaces">(existingWorkspace._id);
+
+      // The two membership upserts below are deliberately kept inline rather than
+      // factored into a shared `upsertMembership<T extends TableNames>` helper.
+      // confect's writer types `.insert` against a *concrete* table literal
+      // (`WithoutSystemFields<DocumentByName<…, T>>`); inside a helper generic
+      // over `T`, TypeScript cannot prove the value matches that mapping, so the
+      // helper only compiles with an `as` assertion — which discards the concrete
+      // insert-shape check these literal call sites get for free (our first line
+      // of defense against schema drift between the provisioning rows and the
+      // Convex schema). The parallel structure is the price of that check, and
+      // it is worth more than removing the duplication. Never reach for `any`
+      // here. See docs/template/coding-standards.md ("Multi-table Convex writes").
+      if (organizationMembership === null) {
+        yield* writer
+          .table("organizationMembers")
+          .insert({
+            ...requireInsertValue(
+              plan.organizationMembership,
+              "organizationMembership",
+            ),
+            organizationId,
+            userId,
+          })
+          .pipe(Effect.orDie);
+      } else if (plan.organizationMembership.action === "patch") {
+        yield* writer
+          .table("organizationMembers")
+          .patch(organizationMembership._id, plan.organizationMembership.value)
+          .pipe(Effect.orDie);
+      }
+
+      if (workspaceMembership === null) {
+        yield* writer
+          .table("workspaceMembers")
+          .insert({
+            ...requireInsertValue(
+              plan.workspaceMembership,
+              "workspaceMembership",
+            ),
+            workspaceId,
+            userId,
+          })
+          .pipe(Effect.orDie);
+      } else if (plan.workspaceMembership.action === "patch") {
+        yield* writer
+          .table("workspaceMembers")
+          .patch(workspaceMembership._id, plan.workspaceMembership.value)
+          .pipe(Effect.orDie);
+      }
 
       return { workspaceId };
     }),
 );
-
-const readIdentityProfile = () =>
-  Effect.gen(function* () {
-    const auth = yield* Auth;
-    return yield* extractIdentityProfile(
-      yield* auth.getUserIdentity.pipe(
-        Effect.mapError(() => new Unauthorized()),
-      ),
-    );
-  });
-
-const readProvisioningUser = (subject: string) =>
-  Effect.gen(function* () {
-    const reader = yield* DatabaseReader;
-    return yield* reader
-      .table("users")
-      .index("by_subject", (q) => q.eq("subject", subject))
-      .first()
-      .pipe(
-        Effect.map(Option.getOrNull),
-        Effect.map((user) => (user === null ? null : toProvisioningUser(user))),
-        Effect.orDie,
-      );
-  });
-
-const provisionUser = (input: {
-  readonly identity: IdentityProfile;
-  readonly existingUser: UserProvisioningRow | null;
-  readonly now: number;
-}) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
-    const userPlan = buildProvisioningPlan({
-      identity: input.identity,
-      state: {
-        user: input.existingUser,
-        liveOrganization: null,
-        liveWorkspace: null,
-        organizationMembership: null,
-        workspaceMembership: null,
-      },
-      now: input.now,
-    }).user;
-
-    if (input.existingUser === null) {
-      return yield* writer
-        .table("users")
-        .insert(requireInsertValue(userPlan, "user"))
-        .pipe(Effect.orDie);
-    }
-
-    const userId = toId<"users">(input.existingUser._id);
-    if (userPlan.action === "patch") {
-      yield* writer
-        .table("users")
-        .patch(userId, userPlan.value)
-        .pipe(Effect.orDie);
-    }
-    return userId;
-  });
-
-const readOwnedWorkspaceState = (userId: GenericId<"users">) =>
-  Effect.gen(function* () {
-    const reader = yield* DatabaseReader;
-    const organizations = yield* reader
-      .table("organizations")
-      .index("by_owner", (q) => q.eq("ownerUserId", userId))
-      .take(100)
-      .pipe(Effect.orDie);
-    const existingOrganization = yield* selectProvisioningRow(() =>
-      selectLiveOwnedOrganization(organizations, userId),
-    );
-
-    const workspaces =
-      existingOrganization === null
-        ? []
-        : yield* reader
-            .table("workspaces")
-            .index("by_organization", (q) =>
-              q.eq("organizationId", existingOrganization._id),
-            )
-            .take(100)
-            .pipe(Effect.orDie);
-    const existingWorkspace = yield* selectProvisioningRow(() =>
-      selectLiveOwnedWorkspace(workspaces, userId),
-    );
-
-    return { existingOrganization, existingWorkspace };
-  });
-
-const readMembershipState = (input: {
-  readonly userId: GenericId<"users">;
-  readonly existingOrganization: OrganizationProvisioningRow | null;
-  readonly existingWorkspace: WorkspaceProvisioningRow | null;
-}) =>
-  Effect.gen(function* () {
-    const reader = yield* DatabaseReader;
-    const existingOrganization = input.existingOrganization;
-    const existingWorkspace = input.existingWorkspace;
-    const organizationMembership =
-      existingOrganization === null
-        ? null
-        : yield* reader
-            .table("organizationMembers")
-            .index("by_organization_user", (q) =>
-              q
-                .eq("organizationId", existingOrganization._id)
-                .eq("userId", input.userId),
-            )
-            .first()
-            .pipe(Effect.map(Option.getOrNull), Effect.orDie);
-
-    const workspaceMembership =
-      existingWorkspace === null
-        ? null
-        : yield* reader
-            .table("workspaceMembers")
-            .index("by_workspace_user", (q) => {
-              const scoped = q.eq("workspaceId", existingWorkspace._id);
-              return scoped.eq("userId", input.userId);
-            })
-            .first()
-            .pipe(Effect.map(Option.getOrNull), Effect.orDie);
-
-    return { organizationMembership, workspaceMembership };
-  });
-
-const provisionOrganization = (input: {
-  readonly plan: ProvisioningPlan;
-  readonly existingOrganization: OrganizationProvisioningRow | null;
-  readonly userId: GenericId<"users">;
-}) =>
-  Effect.gen(function* () {
-    if (input.existingOrganization !== null) {
-      return toId<"organizations">(input.existingOrganization._id);
-    }
-
-    const writer = yield* DatabaseWriter;
-    return yield* writer
-      .table("organizations")
-      .insert({
-        ...requireInsertValue(input.plan.organization, "organization"),
-        ownerUserId: input.userId,
-      })
-      .pipe(Effect.orDie);
-  });
-
-const provisionWorkspace = (input: {
-  readonly plan: ProvisioningPlan;
-  readonly existingWorkspace: WorkspaceProvisioningRow | null;
-  readonly organizationId: GenericId<"organizations">;
-  readonly userId: GenericId<"users">;
-}) =>
-  Effect.gen(function* () {
-    if (input.existingWorkspace !== null) {
-      return toId<"workspaces">(input.existingWorkspace._id);
-    }
-
-    const writer = yield* DatabaseWriter;
-    return yield* writer
-      .table("workspaces")
-      .insert({
-        ...requireInsertValue(input.plan.workspace, "workspace"),
-        organizationId: input.organizationId,
-        ownerUserId: input.userId,
-      })
-      .pipe(Effect.orDie);
-  });
-
-const provisionMemberships = (input: {
-  readonly plan: ProvisioningPlan;
-  readonly organizationMembership: OrganizationMembershipProvisioningRow | null;
-  readonly organizationId: GenericId<"organizations">;
-  readonly workspaceMembership: WorkspaceMembershipProvisioningRow | null;
-  readonly workspaceId: GenericId<"workspaces">;
-  readonly userId: GenericId<"users">;
-}) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
-    yield* applyMembershipPlan({
-      existing: input.organizationMembership,
-      plan: input.plan.organizationMembership,
-      label: "organizationMembership",
-      insert: (value) =>
-        insertMembership(
-          value,
-          { organizationId: input.organizationId, userId: input.userId },
-          (row) =>
-            writer.table("organizationMembers").insert(row).pipe(Effect.orDie),
-        ),
-      patch: (id, value) => patchOrganizationMembership(writer, id, value),
-    });
-
-    yield* applyMembershipPlan({
-      existing: input.workspaceMembership,
-      plan: input.plan.workspaceMembership,
-      label: "workspaceMembership",
-      insert: (value) =>
-        insertMembership(
-          value,
-          { workspaceId: input.workspaceId, userId: input.userId },
-          (row) =>
-            writer.table("workspaceMembers").insert(row).pipe(Effect.orDie),
-        ),
-      patch: (id, value) => patchWorkspaceMembership(writer, id, value),
-    });
-  });
-
-type Writer = typeof DatabaseWriter.Service;
-
-const patchOrganizationMembership = (
-  writer: Writer,
-  id: string,
-  value: Partial<Omit<OrganizationMembershipProvisioningRow, "_id">>,
-) =>
-  writer
-    .table("organizationMembers")
-    .patch(toId<"organizationMembers">(id), value)
-    .pipe(Effect.orDie);
-
-const patchWorkspaceMembership = (
-  writer: Writer,
-  id: string,
-  value: Partial<Omit<WorkspaceMembershipProvisioningRow, "_id">>,
-) =>
-  writer
-    .table("workspaceMembers")
-    .patch(toId<"workspaceMembers">(id), value)
-    .pipe(Effect.orDie);
-
-const insertMembership = <Value extends object, Scope extends object>(
-  value: Value,
-  scope: Scope,
-  write: (row: Value & Scope) => Effect.Effect<unknown>,
-) => write(scopedMembershipValue(value, scope));
-
-const scopedMembershipValue = <Value extends object, Scope extends object>(
-  value: Value,
-  scope: Scope,
-): Value & Scope => ({ ...value, ...scope });
-
-const applyMembershipPlan = <
-  Row extends { readonly _id: string },
-  Value,
->(input: {
-  readonly existing: Row | null;
-  readonly plan: RowPlan<Value>;
-  readonly label: string;
-  readonly insert: (value: Value) => Effect.Effect<unknown>;
-  readonly patch: (id: string, value: Partial<Value>) => Effect.Effect<unknown>;
-}): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    if (input.existing === null) {
-      yield* input.insert(requireInsertValue(input.plan, input.label));
-      return;
-    }
-
-    if (input.plan.action === "patch") {
-      yield* input.patch(input.existing._id, input.plan.value);
-    }
-  });
 
 const toProvisioningUser = (user: {
   readonly _id: GenericId<"users">;
@@ -358,38 +229,6 @@ const toProvisioningUser = (user: {
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
-
-const requireInsertValue = <Value>(
-  plan:
-    | { readonly action: "insert"; readonly value: Value }
-    | { readonly action: "patch" }
-    | { readonly action: "none" },
-  label: string,
-): Value => {
-  if (plan.action !== "insert") {
-    throw new Error(`Expected ${label} provisioning insert plan.`);
-  }
-  return plan.value;
-};
-
-const toId = <TableName extends string>(id: string): GenericId<TableName> =>
-  id as GenericId<TableName>;
-
-const selectProvisioningRow = <
-  Row extends OrganizationProvisioningRow | WorkspaceProvisioningRow,
->(
-  select: () => Row | null,
-): Effect.Effect<Row | null, ProvisioningConflict> =>
-  Effect.try({
-    try: select,
-    catch: (error) =>
-      error instanceof ProvisioningConflict
-        ? error
-        : new ProvisioningConflict({
-            resource: "provisioning",
-            message: "Unexpected provisioning selection failure.",
-          }),
-  });
 
 export default GroupImpl.make(databaseSchema, provisioning).pipe(
   Layer.provide(ensureProvisioned),

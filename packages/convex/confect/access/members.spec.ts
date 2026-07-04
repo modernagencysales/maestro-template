@@ -6,6 +6,7 @@ import {
   Forbidden,
   LastOwnerProtected,
   MemberNotInWorkspace,
+  MembershipNotLive,
   Unauthorized,
 } from "../errors";
 import { Role } from "./roles";
@@ -23,6 +24,7 @@ const changeRole = FunctionSpec.publicMutation({
       Unauthorized,
       Forbidden,
       MemberNotInWorkspace,
+      MembershipNotLive,
       LastOwnerProtected,
     ),
 });
@@ -39,6 +41,7 @@ const remove = FunctionSpec.publicMutation({
       Unauthorized,
       Forbidden,
       MemberNotInWorkspace,
+      MembershipNotLive,
       LastOwnerProtected,
     ),
 });
@@ -50,7 +53,14 @@ const transferOwnership = FunctionSpec.publicMutation({
       membershipId: Id("workspaceMembers"),
     }),
   returns: () => Schema.Null,
-  error: () => Schema.Union(Unauthorized, Forbidden, MemberNotInWorkspace),
+  error: () =>
+    Schema.Union(
+      Unauthorized,
+      Forbidden,
+      MemberNotInWorkspace,
+      MembershipNotLive,
+      LastOwnerProtected,
+    ),
 });
 
 export default GroupSpec.make()

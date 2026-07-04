@@ -37,9 +37,7 @@ export const TemplateRuntimeConfigLive = Layer.effect(
   }),
 );
 
-export const loadTemplateRuntimeConfig = Effect.gen(function* () {
-  return yield* TemplateRuntimeConfig;
-});
+export const loadTemplateRuntimeConfig = TemplateRuntimeConfig;
 
 export const runWithTemplateRuntimeConfig = <A, E, R>(
   effect: Effect.Effect<A, E, R>,

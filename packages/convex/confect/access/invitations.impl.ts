@@ -1,32 +1,36 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
 import * as Clock from "effect/Clock";
-import type * as Context from "effect/Context";
-import * as Either from "effect/Either";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import type { InvitationsDoc, WorkspaceMembersDoc } from "../_generated/docs";
+import type { InvitationsDoc } from "../_generated/docs";
 import databaseSchema from "../_generated/schema";
-import { Auth, DatabaseReader, DatabaseWriter } from "../_generated/services";
+import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { stableFingerprint } from "../shared/tokenCrypto";
 import {
   Forbidden,
   InvitationNotAccessible,
-  Unauthorized,
   WorkspaceNotFound,
 } from "../errors";
+import {
+  asGenericId,
+  loadCurrentUser,
+  requireActorRole,
+  toLifecycleMember,
+  type Reader,
+} from "./handlerContext";
 import {
   acceptInvitation,
   buildWorkspaceInvitation,
   cancelInvitation,
   declineInvitation,
+  isLiveWorkspaceMembership,
   type InvitationRef,
   type WorkspaceMemberLifecycleRef,
 } from "./lifecycle";
 import invitations from "./invitations.spec";
-import { roleAtLeast, type Role } from "./roles";
 
 const create = FunctionImpl.make(
   databaseSchema,
@@ -42,7 +46,13 @@ const create = FunctionImpl.make(
       const workspace = yield* reader
         .table("workspaces")
         .get(workspaceId)
-        .pipe(Effect.mapError(() => new WorkspaceNotFound({ workspaceId })));
+        .pipe(
+          Effect.catchAll((error) =>
+            error._tag === "GetByIdFailure"
+              ? Effect.fail(new WorkspaceNotFound({ workspaceId }))
+              : Effect.die(error),
+          ),
+        );
       const tokenHash = yield* Effect.promise(() =>
         stableFingerprint({
           workspaceId,
@@ -51,17 +61,15 @@ const create = FunctionImpl.make(
           now,
         }),
       );
-      const plan = yield* fromPlanner(
-        buildWorkspaceInvitation({
-          workspaceId,
-          organizationId: workspace.organizationId,
-          inviteeEmail: email,
-          role,
-          invitedByUserId: actor.userId,
-          tokenHash,
-          now,
-        }),
-      );
+      const plan = yield* buildWorkspaceInvitation({
+        workspaceId,
+        organizationId: workspace.organizationId,
+        inviteeEmail: email,
+        role,
+        invitedByUserId: actor.userId,
+        tokenHash,
+        now,
+      });
 
       return yield* writer
         .table("invitations")
@@ -89,15 +97,13 @@ const accept = FunctionImpl.make(
               invitation.workspaceId,
               user._id,
             );
-      const plan = yield* fromPlanner(
-        acceptInvitation({
-          invitation,
-          verifiedEmail: user.email,
-          userId: user._id,
-          existingLiveMembership,
-          now,
-        }),
-      );
+      const plan = yield* acceptInvitation({
+        invitation,
+        verifiedEmail: user.email,
+        userId: user._id,
+        existingLiveMembership,
+        now,
+      });
       const acceptedInvitation = yield* requireLoadedInvitation(invitation);
 
       yield* writer
@@ -117,7 +123,7 @@ const accept = FunctionImpl.make(
       }
 
       return {
-        workspaceId: toId<"workspaces">(acceptedInvitation.workspaceId),
+        workspaceId: asGenericId<"workspaces">(acceptedInvitation.workspaceId),
       };
     }),
 );
@@ -133,13 +139,12 @@ const decline = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
-      const plan = yield* fromPlanner(
-        declineInvitation({
-          invitation,
-          verifiedEmail: user.email,
-          now,
-        }),
-      );
+      const plan = yield* declineInvitation({
+        invitation,
+        verifiedEmail: user.email,
+        userId: user._id,
+        now,
+      });
 
       if (plan.invitationPatch !== null) {
         yield* writer
@@ -164,14 +169,12 @@ const cancel = FunctionImpl.make(
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
       yield* requireActorRole(actor, "admin");
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
-      const plan = yield* fromPlanner(
-        cancelInvitation({
-          invitation,
-          workspaceId,
-          actorUserId: actor.userId,
-          now,
-        }),
-      );
+      const plan = cancelInvitation({
+        invitation,
+        workspaceId,
+        actorUserId: actor.userId,
+        now,
+      });
 
       if (plan.invitationPatch !== null) {
         yield* writer
@@ -183,36 +186,6 @@ const cancel = FunctionImpl.make(
       return null;
     }),
 );
-
-type Reader = Context.Tag.Service<typeof DatabaseReader>;
-
-const fromPlanner = <A, E>(result: Either.Either<A, E>): Effect.Effect<A, E> =>
-  Either.isLeft(result)
-    ? Effect.fail(result.left)
-    : Effect.succeed(result.right);
-
-const loadCurrentUser = (reader: Reader) =>
-  Effect.gen(function* () {
-    const auth = yield* Auth;
-    const identity = yield* auth.getUserIdentity.pipe(
-      Effect.mapError(() => new Unauthorized()),
-    );
-    return yield* reader
-      .table("users")
-      .index("by_subject", (q) => q.eq("subject", identity.subject))
-      .first()
-      .pipe(
-        Effect.map(Option.getOrNull),
-        Effect.flatMap((user) =>
-          user === null
-            ? Effect.fail(new Unauthorized())
-            : Effect.succeed(user),
-        ),
-        Effect.mapError((error) =>
-          error instanceof Unauthorized ? error : new Unauthorized(),
-        ),
-      );
-  });
 
 const loadActorForWorkspace = (
   reader: Reader,
@@ -226,9 +199,7 @@ const loadActorForWorkspace = (
       user._id,
     );
     if (membership === null) {
-      return yield* Effect.fail(
-        new Forbidden({ reason: "No live workspace membership." }),
-      );
+      return yield* new Forbidden({ reason: "No live workspace membership." });
     }
     return {
       userId: user._id,
@@ -245,7 +216,13 @@ const loadInvitationForResponse = (
     .get(invitationId)
     .pipe(
       Effect.map((invitation) => toInvitationRef(invitation)),
-      Effect.catchAll(() => Effect.succeed(null)),
+      // Missing invitation -> null; a decode/system failure is a real defect,
+      // not a silent null (same discrimination as members.impl loadMember).
+      Effect.catchAll((error) =>
+        error._tag === "GetByIdFailure"
+          ? Effect.succeed(null)
+          : Effect.die(error),
+      ),
     );
 
 const loadOptionalLiveWorkspaceMemberForUser = (
@@ -265,11 +242,7 @@ const loadOptionalLiveWorkspaceMemberForUser = (
         membership === null ? null : toLifecycleMember(membership),
       ),
       Effect.map((membership) =>
-        membership !== null &&
-        membership.status === "active" &&
-        membership.acceptedAt !== null &&
-        membership.revokedAt === null &&
-        membership.deletedAt === null
+        membership !== null && isLiveWorkspaceMembership(membership)
           ? membership
           : null,
       ),
@@ -292,36 +265,12 @@ const toInvitationRef = (invitation: InvitationsDoc): InvitationRef => ({
   updatedAt: invitation.updatedAt,
 });
 
-const toLifecycleMember = (
-  member: WorkspaceMembersDoc,
-): WorkspaceMemberLifecycleRef => ({
-  id: member._id,
-  workspaceId: member.workspaceId,
-  userId: member.userId,
-  role: member.role,
-  status: member.status,
-  acceptedAt: member.acceptedAt,
-  revokedAt: member.revokedAt,
-  deletedAt: member.deletedAt,
-});
-
-const requireActorRole = (
-  actor: { readonly role: Role },
-  minimumRole: Role,
-): Effect.Effect<void, Forbidden> =>
-  roleAtLeast(actor.role, minimumRole)
-    ? Effect.void
-    : Effect.fail(new Forbidden({ reason: "Insufficient workspace role." }));
-
 const requireLoadedInvitation = (
   invitation: InvitationRef | null,
 ): Effect.Effect<InvitationRef, InvitationNotAccessible> =>
   invitation === null
     ? Effect.fail(new InvitationNotAccessible())
     : Effect.succeed(invitation);
-
-const toId = <TableName extends string>(id: string): GenericId<TableName> =>
-  id as GenericId<TableName>;
 
 export default GroupImpl.make(databaseSchema, invitations).pipe(
   Layer.provide(create),
