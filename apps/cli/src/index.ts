@@ -23,10 +23,9 @@ export type CliResult = {
 
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
-export const generatedCliOperationRefs = {
-  "brain.pages.createMarkdown":
-    "maestro-template capability run brain.pages.createMarkdown",
-} as const satisfies Record<string, string>;
+export const generatedCliOperationRefs: Readonly<Record<string, string>> = {
+  "brain.pages.createMarkdown": "brain.pages.createMarkdown",
+};
 
 export const runCli = (argv: readonly string[]): CliResult => {
   const [command, subcommand, maybeId] = argv;
@@ -94,13 +93,23 @@ export const runCli = (argv: readonly string[]): CliResult => {
   }
 
   if (command === "capability" && subcommand === "run" && maybeId) {
-    const result = runTemplateApiOperation(maybeId, {
+    const operationId = generatedCliOperationRefs[maybeId];
+
+    if (!operationId) {
+      return {
+        exitCode: 1,
+        stdout: "",
+        stderr: `Unknown CLI capability: ${maybeId}\n`,
+      };
+    }
+
+    const result = runTemplateApiOperation(operationId, {
       workspaceSlug: "acme-demo",
       input: {
         title: "CLI note",
         markdown: "# CLI note",
       },
-      idempotencyKey: `${maybeId}-cli-001`,
+      idempotencyKey: `${operationId}-cli-001`,
     });
 
     return {

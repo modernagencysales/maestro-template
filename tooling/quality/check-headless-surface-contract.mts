@@ -58,7 +58,7 @@ export const cannedRuntimeSuccess = (source: string): string[] => {
   return markers.some((marker) => marker.test(source)) ? ["accepted"] : [];
 };
 
-export const missingGeneratedRefMapping = (
+const missingLiteralGeneratedRefMapping = (
   operationIds: readonly string[],
   source: string,
 ): string[] =>
@@ -68,6 +68,100 @@ export const missingGeneratedRefMapping = (
       !source.includes(`'${operationId}'`) &&
       !source.includes(`\`${operationId}\``),
   );
+
+const objectMappingPattern = (
+  objectName: string,
+  operationId: string,
+  mappedValue: string,
+): RegExp =>
+  new RegExp(
+    `\\b${objectName}\\b[\\s\\S]*?[\"'\`]${operationId}[\"'\`]\\s*:\\s*${mappedValue}`,
+  );
+
+export const missingHttpGeneratedRefMapping = (
+  operationIds: readonly string[],
+  source: string,
+): string[] =>
+  operationIds.filter(
+    (operationId) =>
+      !objectMappingPattern(
+        "operationRefs",
+        operationId,
+        `api\\.${operationId.replaceAll(".", "\\.")}\\b`,
+      ).test(source),
+  );
+
+export const missingCliGeneratedRefUsage = (
+  operationIds: readonly string[],
+  source: string,
+): string[] => {
+  const mappedOperationVariable = source.match(
+    /\b(?:const|let)\s+([a-zA-Z_$][\w$]*)\s*=\s*generatedCliOperationRefs\s*\[[^\]]+\]/,
+  )?.[1];
+  const usesGeneratedCliRefs =
+    /\brunTemplateApiOperation\s*\(\s*generatedCliOperationRefs\s*\[[^\]]+\]/.test(
+      source,
+    ) ||
+    (mappedOperationVariable !== undefined &&
+      new RegExp(
+        `\\brunTemplateApiOperation\\s*\\(\\s*${mappedOperationVariable}\\b`,
+      ).test(source));
+
+  return operationIds.filter(
+    (operationId) =>
+      !objectMappingPattern(
+        "generatedCliOperationRefs",
+        operationId,
+        `[\"'\`]${operationId.replaceAll(".", "\\.")}[\"'\`]`,
+      ).test(source) || !usesGeneratedCliRefs,
+  );
+};
+
+export const missingMcpGeneratedRefUsage = (
+  operationIds: readonly string[],
+  source: string,
+): string[] => {
+  const usesGeneratedRefsForToolListing =
+    /\bgeneratedMcpOperationRefs\s*\[\s*entry\.operationId\s*\]/.test(source);
+  const usesGeneratedRefsForCallDispatch =
+    /\bgeneratedMcpOperationRefs\s*\[\s*candidate\.operationId\s*\]\s*===\s*toolName/.test(
+      source,
+    );
+
+  return operationIds.filter(
+    (operationId) =>
+      !objectMappingPattern(
+        "generatedMcpOperationRefs",
+        operationId,
+        `[\"'\`]template\\.${operationId.replaceAll(".", "\\.")}[\"'\`]`,
+      ).test(source) ||
+      !usesGeneratedRefsForToolListing ||
+      !usesGeneratedRefsForCallDispatch,
+  );
+};
+
+export const missingHttpExecutorDispatch = (source: string): boolean =>
+  !/\bexecuteHeadlessOperation\s*\(/.test(source) ||
+  !/\brefs\s*:\s*operationRefs\b/.test(source);
+
+type GeneratedRefProjection = "literal" | "http" | "cli" | "mcp";
+
+export const missingGeneratedRefMapping = (
+  operationIds: readonly string[],
+  source: string,
+  projection: GeneratedRefProjection = "literal",
+): string[] => {
+  if (projection === "http") {
+    return missingHttpGeneratedRefMapping(operationIds, source);
+  }
+  if (projection === "cli") {
+    return missingCliGeneratedRefUsage(operationIds, source);
+  }
+  if (projection === "mcp") {
+    return missingMcpGeneratedRefUsage(operationIds, source);
+  }
+  return missingLiteralGeneratedRefMapping(operationIds, source);
+};
 
 const missingIdempotencyProof = (
   operations: readonly HeadlessManifestOperation[],
@@ -146,19 +240,27 @@ export const evaluateHeadlessSurfaceContract = async (
   const apiMissingRefs = missingGeneratedRefMapping(
     exposedOperationIds(operations, "api"),
     httpSource,
+    "http",
   );
   const cliMissingRefs = missingGeneratedRefMapping(
     exposedOperationIds(operations, "cli"),
     cliSource,
+    "cli",
   );
   const mcpMissingRefs = missingGeneratedRefMapping(
     exposedOperationIds(operations, "mcp"),
-    `${workflowSource}\n${mcpSource}`,
+    workflowSource,
+    "mcp",
   );
 
   for (const operationId of apiMissingRefs) {
     failures.push(
       `API operation ${operationId} lacks a generated ref mapping in packages/convex/confect/http.ts`,
+    );
+  }
+  if (missingHttpExecutorDispatch(httpSource)) {
+    failures.push(
+      "API HTTP dispatch must execute generated operationRefs through executeHeadlessOperation",
     );
   }
   for (const operationId of cliMissingRefs) {

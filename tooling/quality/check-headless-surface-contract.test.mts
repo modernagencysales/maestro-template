@@ -4,7 +4,11 @@ import {
   cannedRegistryImport,
   cannedRuntimeSuccess,
   descriptor,
+  missingCliGeneratedRefUsage,
   missingGeneratedRefMapping,
+  missingHttpExecutorDispatch,
+  missingHttpGeneratedRefMapping,
+  missingMcpGeneratedRefUsage,
   missingTypedErrors,
 } from "./check-headless-surface-contract.mts";
 
@@ -69,6 +73,115 @@ describe("check:headless-surface-contract", () => {
         ["brain.pages.createMarkdown"],
         '{"brain.pages.createMarkdown": api.brain.pages.createMarkdown}',
       ),
+    ).toEqual([]);
+  });
+
+  it("rejects API operation IDs that appear only in routes or help text", () => {
+    const routeOnlySource = `
+      const templateHttpRoutes = [{
+        path: "/api/brain.pages.createMarkdown",
+        description: "Executes brain.pages.createMarkdown.",
+      }];
+    `;
+
+    expect(
+      missingHttpGeneratedRefMapping(
+        ["brain.pages.createMarkdown"],
+        routeOnlySource,
+      ),
+    ).toContain("brain.pages.createMarkdown");
+    expect(missingHttpExecutorDispatch(routeOnlySource)).toBe(true);
+  });
+
+  it("accepts API mappings only when operationRefs feed the executor", () => {
+    const source = `
+      const operationRefs = {
+        "brain.pages.createMarkdown": api.brain.pages.createMarkdown,
+      };
+
+      return executeHeadlessOperation(
+        { refs: operationRefs, runMutation },
+        executorRequest.request,
+      );
+    `;
+
+    expect(
+      missingHttpGeneratedRefMapping(["brain.pages.createMarkdown"], source),
+    ).toEqual([]);
+    expect(missingHttpExecutorDispatch(source)).toBe(false);
+  });
+
+  it("rejects inert CLI mapping constants", () => {
+    const unusedMappingSource = `
+      export const generatedCliOperationRefs = {
+        "brain.pages.createMarkdown": "brain.pages.createMarkdown",
+      };
+
+      const help = "maestro-template capability run brain.pages.createMarkdown";
+      return runTemplateApiOperation(maybeId, {});
+    `;
+
+    expect(
+      missingCliGeneratedRefUsage(
+        ["brain.pages.createMarkdown"],
+        unusedMappingSource,
+      ),
+    ).toContain("brain.pages.createMarkdown");
+  });
+
+  it("accepts CLI mappings only when dispatch resolves through them", () => {
+    const source = `
+      export const generatedCliOperationRefs = {
+        "brain.pages.createMarkdown": "brain.pages.createMarkdown",
+      };
+
+      const operationId = generatedCliOperationRefs[maybeId];
+      return runTemplateApiOperation(operationId, {});
+    `;
+
+    expect(
+      missingCliGeneratedRefUsage(["brain.pages.createMarkdown"], source),
+    ).toEqual([]);
+  });
+
+  it("requires MCP mappings for both tool listing and call dispatch", () => {
+    const unusedMappingSource = `
+      export const generatedMcpOperationRefs = {
+        "brain.pages.createMarkdown": "template.brain.pages.createMarkdown",
+      };
+
+      const tools = entries.map((entry) => ({
+        name: \`template.\${entry.operationId}\`,
+      }));
+      const operation = entries.find(
+        (candidate) => \`template.\${candidate.operationId}\` === toolName,
+      );
+    `;
+
+    expect(
+      missingMcpGeneratedRefUsage(
+        ["brain.pages.createMarkdown"],
+        unusedMappingSource,
+      ),
+    ).toContain("brain.pages.createMarkdown");
+  });
+
+  it("accepts MCP mappings only when listing and dispatch use them", () => {
+    const source = `
+      export const generatedMcpOperationRefs = {
+        "brain.pages.createMarkdown": "template.brain.pages.createMarkdown",
+      };
+
+      const tools = entries.map((entry) => ({
+        name: generatedMcpOperationRefs[entry.operationId],
+      }));
+      const operation = entries.find(
+        (candidate) => generatedMcpOperationRefs[candidate.operationId] === toolName,
+      );
+    `;
+
+    expect(
+      missingMcpGeneratedRefUsage(["brain.pages.createMarkdown"], source),
     ).toEqual([]);
   });
 });

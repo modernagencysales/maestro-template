@@ -360,7 +360,7 @@ export const callMcpTool = (
   const operation = confectManifest.functions.find(
     (candidate) =>
       hasSurface(candidate, "mcp") &&
-      `template.${candidate.operationId}` === toolName,
+      generatedMcpOperationRefs[candidate.operationId] === toolName,
   );
 
   if (!operation) {
