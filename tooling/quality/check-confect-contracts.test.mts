@@ -24,6 +24,11 @@ describe("check:confect-contracts", () => {
         "const run = FunctionSpec.publicAction({ name: 'run' });",
       ),
     ).toContain("typed error");
+    expect(
+      publicSpecMissingError(
+        "const run = FunctionSpec.publicNodeAction({ name: 'run' });",
+      ),
+    ).toContain("typed error");
   });
 
   it("allows public specs with declared typed errors", () => {

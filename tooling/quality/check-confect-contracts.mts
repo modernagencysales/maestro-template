@@ -21,9 +21,7 @@ const publicSpecConstructors = [
   "publicQuery",
   "publicMutation",
   "publicAction",
-  // Confect node public actions have appeared under this local constructor
-  // spelling in plan work; keep it explicit until the upstream API settles.
-  "nodePublicAction",
+  "publicNodeAction",
 ] as const;
 
 async function exists(path: string): Promise<boolean> {
