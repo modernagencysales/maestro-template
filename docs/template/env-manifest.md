@@ -15,6 +15,9 @@ rotation guidance.
 - Fake mode must run without live provider credentials.
 - Production forks must rotate provider secrets at launch, on team turnover,
   after incidents, and at the provider's required cadence.
+- Template runtime settings are loaded through `TemplateRuntimeConfig` and
+  `runWithTemplateRuntimeConfig`, not ad hoc environment reads. Legacy shared
+  env helpers remain compatibility wrappers for live secret validation.
 - Provider SDKs are constructed only inside typed config decoders and Effect
   services.
 - `APP_PROVIDER_MODE=fake` is the default until the fork passes provider doctor
@@ -24,7 +27,7 @@ rotation guidance.
 
 | Provider                  | Env vars                                                                                                                             | Owner                   | Used by                                                                | Fake mode                                                                                                                                                       | Production requirement                                                                                                 | Rotation                                                                                                          |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| App identity              | `APP_NAME`, `APP_PUBLIC_BASE_URL`, `APP_ENV`, `APP_PROVIDER_MODE`                                                                    | Implementation lead     | web shell, handoff packet, generator output, provider doctors          | Uses `acme-demo` and `example.test` URLs                                                                                                                        | Must match client app name, deployed domain, and environment                                                           | Review on every client handoff and release promotion                                                              |
+| App identity              | `APP_NAME`, `APP_PUBLIC_BASE_URL`, `APP_ENV`, `APP_PROVIDER_MODE`, `TEMPLATE_RUNTIME_MODE`, `TEMPLATE_PUBLIC_BASE_URL`               | Implementation lead     | web shell, handoff packet, generator output, provider doctors          | Uses `acme-demo`, `fake`, and localhost/example URLs                                                                                                            | Must match client app name, deployed domain, and environment                                                           | Review on every client handoff and release promotion                                                              |
 | Convex                    | `CONVEX_DEPLOYMENT`, `VITE_CONVEX_URL`, `CONVEX_SITE_URL`                                                                            | Backend owner           | Convex runtime, Confect generated refs, web client                     | Template showcase points at the live demo deployment (`convexUrl` in `project.config.json`); forks point at fake/example URLs until their own deployment exists | Required for any backend-backed fork; production must use the production Convex deployment                             | Rotate deployment admin access on team changes; regenerate URL mapping on deployment changes                      |
 | WorkOS AuthKit            | `WORKOS_CLIENT_ID`, `WORKOS_ORGANIZATION_ID`, `WORKOS_REDIRECT_URI`, `WORKOS_LOGOUT_URI`, `WORKOS_COOKIE_PASSWORD`, `WORKOS_API_KEY` | Security owner          | TanStack Start auth shell, Convex auth bridge, membership provisioning | Fake IDs and cookie password keep local demos non-live                                                                                                          | Required for production auth; redirect/logout URLs must match deployed domains; API key stays server-only              | Rotate API key and cookie password before production, after access changes, and after any suspected leak          |
 | PostHog                   | `POSTHOG_KEY`, `POSTHOG_HOST`, `POSTHOG_DISABLED`                                                                                    | Product analytics owner | web analytics provider, backend event seam, readiness checks           | `POSTHOG_DISABLED=true` drops or records local test events only                                                                                                 | Required only when analytics is enabled for the client; client data-map must approve captured events                   | Rotate project key when project ownership changes; review capture schema every release                            |
@@ -50,6 +53,18 @@ JWKS URL, and client/application ID. The template ships a fake-safe
 `packages/convex/convex/auth.config.ts`; production forks must replace the
 issuer/JWKS/client values through the deployment secret/config path before
 claiming live auth readiness.
+
+## Template Runtime Config
+
+`TEMPLATE_RUNTIME_MODE` controls the Effect runtime mode boundary. Valid values
+are `fake`, `test`, and `live`; the default is `fake`.
+
+`TEMPLATE_PUBLIC_BASE_URL` is the public URL used by template runtime services.
+The default is `http://localhost:5173`.
+
+Runtime services should depend on `TemplateRuntimeConfig` and tests should use
+`runWithTemplateRuntimeConfig` with an Effect `ConfigProvider` override when
+they need deterministic values.
 
 ## Quickstart Modes
 
