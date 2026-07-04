@@ -82,6 +82,7 @@ describe("template HTTP docs routes", () => {
               "Unauthorized",
               "MemberNotInWorkspace",
               "WorkspaceNotFound",
+              "ValidationFailed",
             ],
             requestBody: {
               required: true,

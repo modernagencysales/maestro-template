@@ -43,6 +43,17 @@ export const missingTypedErrors = (
     )
     .map((operation) => operation.operationId);
 
+export const missingExternalValidationError = (
+  operations: readonly HeadlessManifestOperation[],
+): string[] =>
+  operations
+    .filter(
+      (operation) =>
+        hasExternalSurface(operation) &&
+        !operation.typedErrors.includes("ValidationFailed"),
+    )
+    .map((operation) => operation.operationId);
+
 export const cannedRegistryImport = (source: string): string[] => {
   const forbiddenImport =
     /import\s*\{[^}]*\btemplateRegistry\b[^}]*\}\s*from\s*["']@maestro-template\/template-core["']/m;
@@ -161,6 +172,10 @@ export const missingHttpExecutorDispatch = (source: string): boolean =>
   !/\bexecuteHeadlessOperation\s*\(/.test(source) ||
   !/\brefs\s*:\s*operationRefs\b/.test(source);
 
+export const missingRuntimeAdapterDispatch = (source: string): boolean =>
+  !/\bTemplateRuntimeAdapter\b/.test(source) ||
+  !/\bruntime\.runGeneratedOperation\s*\(/.test(source);
+
 type GeneratedRefProjection = "literal" | "http" | "cli" | "mcp";
 
 export const missingGeneratedRefMapping = (
@@ -238,6 +253,12 @@ export const evaluateHeadlessSurfaceContract = async (
     );
   }
 
+  for (const operationId of missingExternalValidationError(operations)) {
+    failures.push(
+      `operation ${operationId} is exposed to API/CLI/MCP without declaring ValidationFailed for envelope validation errors`,
+    );
+  }
+
   for (const operationId of missingIdempotencyProof(
     operations,
     [
@@ -301,6 +322,11 @@ export const evaluateHeadlessSurfaceContract = async (
   for (const operationId of mcpMissingRefs) {
     failures.push(
       `MCP operation ${operationId} lacks a generated ref mapping in the MCP projection`,
+    );
+  }
+  if (missingRuntimeAdapterDispatch(workflowSource)) {
+    failures.push(
+      "CLI/MCP compatibility projection must dispatch through an explicit runtime adapter before returning FeatureDisabled",
     );
   }
 

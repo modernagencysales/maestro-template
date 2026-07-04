@@ -14,6 +14,7 @@ export const confectManifest = {
         "Unauthorized",
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
+        "ValidationFailed",
       ],
       idempotent: false,
       argsSchemaName: "brain.pages.createMarkdown.args",

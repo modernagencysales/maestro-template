@@ -5,11 +5,13 @@ import {
   cannedRegistryImportFailures,
   cannedRuntimeSuccess,
   descriptor,
+  missingExternalValidationError,
   missingCliGeneratedRefUsage,
   missingGeneratedRefMapping,
   missingHttpExecutorDispatch,
   missingHttpGeneratedRefMapping,
   missingMcpGeneratedRefUsage,
+  missingRuntimeAdapterDispatch,
   missingTypedErrors,
 } from "./check-headless-surface-contract.mts";
 
@@ -33,6 +35,33 @@ describe("check:headless-surface-contract", () => {
           operationId: "api.x",
           surfaces: ["api"],
           typedErrors: ["ValidationFailed"],
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("requires external surfaces to declare validation failures", () => {
+    expect(
+      missingExternalValidationError([
+        {
+          operationId: "api.x",
+          surfaces: ["api"],
+          typedErrors: ["Unauthorized"],
+        },
+      ]),
+    ).toEqual(["api.x"]);
+
+    expect(
+      missingExternalValidationError([
+        {
+          operationId: "api.x",
+          surfaces: ["api"],
+          typedErrors: ["Unauthorized", "ValidationFailed"],
+        },
+        {
+          operationId: "web.x",
+          surfaces: ["web"],
+          typedErrors: ["Unauthorized"],
         },
       ]),
     ).toEqual([]);
@@ -124,6 +153,23 @@ describe("check:headless-surface-contract", () => {
       missingHttpGeneratedRefMapping(["brain.pages.createMarkdown"], source),
     ).toEqual([]);
     expect(missingHttpExecutorDispatch(source)).toBe(false);
+  });
+
+  it("requires CLI and MCP projections to use a runtime adapter seam", () => {
+    expect(
+      missingRuntimeAdapterDispatch(
+        "return { ok: false, error: { _tag: 'FeatureDisabled' } };",
+      ),
+    ).toBe(true);
+
+    expect(
+      missingRuntimeAdapterDispatch(`
+        export type TemplateRuntimeAdapter = {
+          runGeneratedOperation: () => ({ ok: true });
+        };
+        return runtime.runGeneratedOperation(request);
+      `),
+    ).toBe(false);
   });
 
   it("rejects API mappings with regex-compatible but wrong operation IDs", () => {

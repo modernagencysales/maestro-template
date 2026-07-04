@@ -61,6 +61,7 @@ describe("workflow headless registry", () => {
           "Unauthorized",
           "MemberNotInWorkspace",
           "WorkspaceNotFound",
+          "ValidationFailed",
         ],
       },
     ]);
@@ -83,6 +84,7 @@ describe("workflow headless registry", () => {
         "Unauthorized",
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
+        "ValidationFailed",
       ],
     });
     expect(buildGeneratedMcpTools()).not.toContainEqual(
@@ -117,6 +119,7 @@ describe("workflow headless registry", () => {
         "Unauthorized",
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
+        "ValidationFailed",
       ]),
     });
     const createMarkdown =
@@ -128,6 +131,7 @@ describe("workflow headless registry", () => {
         "Unauthorized",
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
+        "ValidationFailed",
       ],
       requestBody: {
         required: true,
@@ -195,6 +199,41 @@ describe("workflow headless registry", () => {
     });
   });
 
+  it("executes manifest operations through an explicit runtime adapter", () => {
+    expect(
+      runTemplateApiOperation(
+        "brain.pages.createMarkdown",
+        {
+          workspaceSlug: "acme-demo",
+          input: { title: "A note", markdown: "# A note" },
+          idempotencyKey: "receipt-example-001",
+        },
+        undefined,
+        {
+          runGeneratedOperation: (request) => ({
+            ok: true,
+            operationId: request.operationId,
+            result: {
+              ref: request.operationId,
+              surface: request.surface,
+              workspaceSlug: request.workspaceSlug,
+              idempotencyKey: request.idempotencyKey,
+            },
+          }),
+        },
+      ),
+    ).toEqual({
+      ok: true,
+      operationId: "brain.pages.createMarkdown",
+      result: {
+        ref: "brain.pages.createMarkdown",
+        surface: "cli",
+        workspaceSlug: "acme-demo",
+        idempotencyKey: "receipt-example-001",
+      },
+    });
+  });
+
   it("returns typed API errors for unknown operations and invalid requests", () => {
     expect(runTemplateApiOperation("nope")).toEqual({
       ok: false,
@@ -251,6 +290,41 @@ describe("workflow headless registry", () => {
       trustReceiptId: "trust_run_template_001",
       trustReceipt: {
         receiptId: "trust_run_template_001",
+      },
+    });
+  });
+
+  it("executes MCP manifest operations through an explicit runtime adapter", () => {
+    const capabilityResult = callMcpTool(
+      "template.brain.pages.createMarkdown",
+      undefined,
+      {
+        runGeneratedOperation: (request) => ({
+          ok: true,
+          operationId: request.operationId,
+          result: {
+            ref: request.operationId,
+            surface: request.surface,
+            workspaceSlug: request.workspaceSlug,
+          },
+        }),
+      },
+      {
+        workspaceSlug: "acme-demo",
+        input: { title: "MCP note", markdown: "# MCP note" },
+        idempotencyKey: "mcp-example-001",
+        surface: "cli",
+      },
+    );
+
+    expect(capabilityResult.isError).toBe(false);
+    expect(JSON.parse(capabilityResult.content[0]?.text ?? "{}")).toEqual({
+      ok: true,
+      operationId: "brain.pages.createMarkdown",
+      result: {
+        ref: "brain.pages.createMarkdown",
+        surface: "mcp",
+        workspaceSlug: "acme-demo",
       },
     });
   });

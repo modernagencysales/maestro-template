@@ -54,6 +54,7 @@ describe("maestro-template CLI", () => {
               "Unauthorized",
               "MemberNotInWorkspace",
               "WorkspaceNotFound",
+              "ValidationFailed",
             ],
             requestBody: {
               required: true,

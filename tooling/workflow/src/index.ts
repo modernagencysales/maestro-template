@@ -51,6 +51,7 @@ export type TemplateApiRequest = {
   readonly workspaceSlug?: string;
   readonly input?: Record<string, unknown>;
   readonly idempotencyKey?: string;
+  readonly surface?: ManifestSurface;
 };
 
 export type TemplateApiResult =
@@ -67,6 +68,21 @@ export type TemplateApiResult =
         readonly message: string;
       };
     };
+
+export type TemplateRuntimeRequest = {
+  readonly operationId: ManifestFunction["operationId"];
+  readonly surface: ManifestSurface;
+  readonly workspaceSlug: string;
+  readonly input: Record<string, unknown>;
+  readonly idempotencyKey?: string;
+  readonly typedErrors: readonly string[];
+};
+
+export type TemplateRuntimeAdapter = {
+  readonly runGeneratedOperation: (
+    request: TemplateRuntimeRequest,
+  ) => TemplateApiResult;
+};
 
 type JsonSchema = {
   readonly type?: string;
@@ -269,12 +285,14 @@ export const runTemplateApiOperation = (
   operationId: string,
   request: TemplateApiRequest = {},
   _registry?: TemplateRegistry,
+  runtime?: TemplateRuntimeAdapter,
 ): TemplateApiResult => {
-  const operation = buildApiCatalog(_registry).find(
-    (entry) => entry.operationId === operationId,
+  const surface = request.surface ?? "cli";
+  const manifestEntry = confectManifest.functions.find(
+    (entry) => entry.operationId === operationId && hasSurface(entry, surface),
   );
 
-  if (!operation) {
+  if (manifestEntry === undefined) {
     return {
       ok: false,
       error: {
@@ -296,15 +314,7 @@ export const runTemplateApiOperation = (
     };
   }
 
-  const manifestEntry = confectManifest.functions.find(
-    (entry) => entry.operationId === operationId,
-  );
-
-  if (
-    manifestEntry &&
-    !manifestEntry.idempotent &&
-    !request.idempotencyKey?.trim()
-  ) {
+  if (!manifestEntry.idempotent && !request.idempotencyKey?.trim()) {
     return {
       ok: false,
       error: {
@@ -312,6 +322,18 @@ export const runTemplateApiOperation = (
         message: `Operation ${operationId} requires a nonblank idempotencyKey.`,
       },
     };
+  }
+
+  if (runtime !== undefined) {
+    const idempotencyKey = request.idempotencyKey?.trim();
+    return runtime.runGeneratedOperation({
+      operationId: manifestEntry.operationId,
+      surface,
+      workspaceSlug,
+      input: request.input ?? {},
+      typedErrors: manifestEntry.typedErrors,
+      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+    });
   }
 
   return {
@@ -394,6 +416,8 @@ const mcpError = (message: string): McpToolCallResult => ({
 export const callMcpTool = (
   toolName: string,
   registry?: TemplateRegistry,
+  runtime?: TemplateRuntimeAdapter,
+  request: TemplateApiRequest = {},
 ): McpToolCallResult => {
   if (toolName === workflowRunMcpTool.name) {
     return mcpText(runTemplateWorkflow(registry));
@@ -407,6 +431,20 @@ export const callMcpTool = (
 
   if (!operation) {
     return mcpError(`Unknown MCP tool: ${toolName}`);
+  }
+
+  const result = runTemplateApiOperation(
+    operation.operationId,
+    {
+      ...request,
+      surface: "mcp",
+    },
+    registry,
+    runtime,
+  );
+
+  if (runtime !== undefined) {
+    return mcpText(result);
   }
 
   return mcpText({

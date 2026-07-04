@@ -21,6 +21,8 @@ const BrainPageError = Schema.Union(
   WorkspaceNotFound,
 );
 
+const BrainPageWriteError = Schema.Union(BrainPageError, ValidationFailed);
+
 const ListArgs = Schema.Struct({
   workspaceId: Id("workspaces"),
 });
@@ -74,7 +76,7 @@ const createMarkdown = defineContractFunction(
     name: "createMarkdown",
     args: () => CreateMarkdownArgs,
     returns: () => CreateMarkdownReturns,
-    error: () => BrainPageError,
+    error: () => BrainPageWriteError,
   }),
   {
     namespace: "brain.pages",
@@ -82,7 +84,12 @@ const createMarkdown = defineContractFunction(
     operationId: "brain.pages.createMarkdown",
     kind: "mutation",
     surfaces: ["web", "api", "cli", "mcp"],
-    typedErrors: ["Unauthorized", "MemberNotInWorkspace", "WorkspaceNotFound"],
+    typedErrors: [
+      "Unauthorized",
+      "MemberNotInWorkspace",
+      "WorkspaceNotFound",
+      "ValidationFailed",
+    ],
     idempotent: false,
     argsSchemaName: "brain.pages.createMarkdown.args",
     returnsSchemaName: "brain.pages.createMarkdown.returns",

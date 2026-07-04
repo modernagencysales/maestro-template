@@ -61,6 +61,7 @@ describe("template sample data", () => {
         "Unauthorized",
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
+        "ValidationFailed",
       ],
       authScope: "unknown",
     });
