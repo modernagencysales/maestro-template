@@ -1,5 +1,6 @@
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { GroupSpec } from "@confect/core";
 import * as S from "effect/Schema";
+import { internalMutationStep, publicMutation } from "./_kit/capability";
 
 export const SourceGroundedBriefArgs = S.Struct({
   workspaceId: S.String,
@@ -16,83 +17,16 @@ export const SourceGroundedBriefReturn = S.Struct({
   trustClaim: S.String,
 });
 
-export namespace SourceGroundedBriefError {
-  export class Unauthenticated extends S.TaggedError<Unauthenticated>()(
-    "Unauthenticated",
-    {},
-  ) {}
-
-  export class NoWorkspaceAccess extends S.TaggedError<NoWorkspaceAccess>()(
-    "NoWorkspaceAccess",
-    {
-      workspaceId: S.String,
-    },
-  ) {}
-
-  export class ValidationFailed extends S.TaggedError<ValidationFailed>()(
-    "ValidationFailed",
-    {
-      field: S.String,
-      message: S.String,
-    },
-  ) {}
-
-  export class PolicyNotFound extends S.TaggedError<PolicyNotFound>()(
-    "PolicyNotFound",
-    {
-      kind: S.String,
-      workspaceId: S.String,
-    },
-  ) {}
-
-  export class PromptNotFound extends S.TaggedError<PromptNotFound>()(
-    "PromptNotFound",
-    {
-      promptRef: S.String,
-    },
-  ) {}
-
-  export class LlmDisabled extends S.TaggedError<LlmDisabled>()(
-    "LlmDisabled",
-    {},
-  ) {}
-
-  export class RateLimited extends S.TaggedError<RateLimited>()("RateLimited", {
-    retryAfterMs: S.Number,
-  }) {}
-
-  export class SpendCapExceeded extends S.TaggedError<SpendCapExceeded>()(
-    "SpendCapExceeded",
-    {
-      dailySpendLimitCents: S.Number,
-    },
-  ) {}
-
-  export class ProviderConfigInvalid extends S.TaggedError<ProviderConfigInvalid>()(
-    "ProviderConfigInvalid",
-    {
-      provider: S.String,
-    },
-  ) {}
-
-  export const Schema = S.Union(
-    Unauthenticated,
-    NoWorkspaceAccess,
-    ValidationFailed,
-    PolicyNotFound,
-    PromptNotFound,
-    LlmDisabled,
-    RateLimited,
-    SpendCapExceeded,
-    ProviderConfigInvalid,
-  );
-}
-
-const run = FunctionSpec.publicMutation({
+const run = publicMutation({
   name: "run",
   args: () => SourceGroundedBriefArgs,
   returns: () => SourceGroundedBriefReturn,
-  error: () => SourceGroundedBriefError.Schema,
 });
 
-export default GroupSpec.make().addFunction(run);
+const runInternal = internalMutationStep({
+  name: "runInternal",
+  args: () => SourceGroundedBriefArgs,
+  returns: () => SourceGroundedBriefReturn,
+});
+
+export default GroupSpec.make().addFunction(run).addFunction(runInternal);
