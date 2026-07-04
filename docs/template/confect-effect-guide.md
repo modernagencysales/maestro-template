@@ -133,11 +133,15 @@ fixtures, and JavaScript client type fixtures.
 
 ## Generated Contract Manifest
 
-The generated Confect spec tree is the source of truth for API, CLI, MCP,
-OpenAPI, Scalar, workflow, and web-facing operation metadata. Manifest metadata
-comes from spec-bound builder helpers such as capability and workflow contract
-builders, is regenerated with `pnpm confect:manifest`, and is parity-checked
-against generated refs by the contract and headless-surface gates.
+For migrated/spec-bound operations, the generated Confect spec tree is the
+source of truth for API, CLI, MCP, OpenAPI, Scalar, workflow, and web-facing
+operation metadata. Current manifest coverage is seeded from operations that
+have moved onto spec-bound builders, such as `brain/pages` and
+`capabilities/sourceGroundedBrief`; not every Confect spec file emits manifest
+metadata yet. Manifest metadata comes from spec-bound builder helpers such as
+capability and workflow contract builders, is regenerated with
+`pnpm confect:manifest`, and is parity-checked against generated refs by the
+contract and headless-surface gates.
 
 Target rules:
 

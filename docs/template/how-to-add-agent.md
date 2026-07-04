@@ -17,14 +17,14 @@ pnpm template:add-agent -- --name workflow_architect --write
 - `docs/template/generated/agents/<name>.md`
 
 Generated agent seats are web-facing by default with `surfaces: ["web"]`. They
-do not create API, CLI, MCP, `.headless.json`, or headless registry exposure
-until a separate headless contract review approves it.
+do not create API, CLI, MCP, generated manifest/headless metadata, or explicit
+generated ref mappings until a separate headless contract review approves them.
 
 After writing an agent slice, run `pnpm confect:codegen`,
 `pnpm confect:manifest`, and the focused agent tests before wiring generated
 refs into the web surface. Keep API, CLI, and MCP denied unless a later headless
-exposure task adds typed public errors, idempotency posture, generated ref
-mappings, and surface tests.
+contract task adds typed public errors, idempotency posture, generated
+manifest/headless metadata, explicit generated ref mappings, and surface tests.
 
 ## Tests
 

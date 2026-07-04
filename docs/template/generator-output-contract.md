@@ -18,7 +18,8 @@ For backend or headless behavior, emit or update:
 - behavior tests.
 - reviewer-safe fixtures.
 - README or generated docs.
-- headless registry entry when exposed.
+- generated manifest/headless metadata and explicit generated ref mappings when
+  exposed.
 - API, CLI, MCP, and OpenAPI/Scalar metadata when exposed.
 - audit metadata.
 - data-map metadata.
