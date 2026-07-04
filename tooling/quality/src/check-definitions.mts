@@ -598,6 +598,30 @@ export const checkDescriptors = {
           "integrations docs must define PostHog backend Confect failure capture and query limitation",
       },
       {
+        file: ".env.example",
+        includes: [
+          "POSTHOG_PROJECT_TOKEN=phc_test_placeholder",
+          "POSTHOG_HOST=http://localhost",
+        ],
+        absent: ["POSTHOG_KEY", "POSTHOG_DISABLED"],
+        message:
+          ".env.example must use PostHog Convex component env names and fake/test placeholders",
+      },
+      {
+        file: "packages/integrations/src/index.ts",
+        includes: ['requiredEnv: ["POSTHOG_PROJECT_TOKEN", "POSTHOG_HOST"]'],
+        absent: ['requiredEnv: ["POSTHOG_KEY", "POSTHOG_HOST"]'],
+        message:
+          "provider descriptors must use the PostHog Convex component project token env",
+      },
+      {
+        file: "tooling/generators/src/index.ts",
+        includes: ['posthog: ["POSTHOG_PROJECT_TOKEN", "POSTHOG_HOST"]'],
+        absent: ['posthog: ["POSTHOG_KEY", "POSTHOG_HOST"]'],
+        message:
+          "template generator required secrets must use the PostHog project token env",
+      },
+      {
         file: "docs/template/env-manifest.md",
         includes: [
           "POSTHOG_PROJECT_TOKEN",

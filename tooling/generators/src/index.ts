@@ -247,7 +247,7 @@ const defaultDeploymentTargets = [
 const requiredSecretNamesByProvider = {
   convex: ["CONVEX_DEPLOYMENT", "VITE_CONVEX_URL"],
   workos: ["WORKOS_API_KEY", "WORKOS_CLIENT_ID", "WORKOS_COOKIE_PASSWORD"],
-  posthog: ["POSTHOG_KEY", "POSTHOG_HOST"],
+  posthog: ["POSTHOG_PROJECT_TOKEN", "POSTHOG_HOST"],
   dodo: ["DODO_API_KEY", "DODO_WEBHOOK_SECRET"],
   email: ["MAILERSEND_API_KEY", "MAILERSEND_FROM_EMAIL"],
   llm: ["OPENROUTER_API_KEY"],
