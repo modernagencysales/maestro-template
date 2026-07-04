@@ -49,6 +49,20 @@ export const cannedRegistryImport = (source: string): string[] => {
   return forbiddenImport.test(source) ? ["templateRegistry"] : [];
 };
 
+type RuntimeSource = {
+  readonly path: string;
+  readonly source: string;
+};
+
+export const cannedRegistryImportFailures = (
+  sources: readonly RuntimeSource[],
+): string[] =>
+  sources.flatMap(({ path, source }) =>
+    cannedRegistryImport(source).map(
+      (marker) => `${path} imports forbidden canned registry ${marker}`,
+    ),
+  );
+
 export const cannedRuntimeSuccess = (source: string): string[] => {
   const markers = [
     /\baccepted\s*:\s*true\b/,
@@ -200,6 +214,7 @@ export const evaluateHeadlessSurfaceContract = async (
     httpSource,
     cliSource,
     workflowSource,
+    workflowCompatSource,
     executorSource,
     httpTests,
     executorTests,
@@ -209,6 +224,7 @@ export const evaluateHeadlessSurfaceContract = async (
     readRepoFile(repoRoot, "packages/convex/confect/http.ts"),
     readRepoFile(repoRoot, "apps/cli/src/index.ts"),
     readRepoFile(repoRoot, "tooling/workflow/src/index.ts"),
+    readRepoFile(repoRoot, "tooling/workflow/src/workflow-compat.ts"),
     readRepoFile(repoRoot, "packages/convex/confect/manifest/executor.ts"),
     readRepoFile(repoRoot, "packages/convex/test/http-docs.test.ts"),
     readRepoFile(repoRoot, "packages/convex/test/headless-executor.test.ts"),
@@ -253,6 +269,19 @@ export const evaluateHeadlessSurfaceContract = async (
     workflowSource,
     "mcp",
   );
+  const runtimeSources = [
+    { path: "packages/convex/confect/http.ts", source: httpSource },
+    { path: "apps/cli/src/index.ts", source: cliSource },
+    { path: "tooling/workflow/src/index.ts", source: workflowSource },
+    {
+      path: "tooling/workflow/src/workflow-compat.ts",
+      source: workflowCompatSource,
+    },
+    {
+      path: "packages/convex/confect/manifest/executor.ts",
+      source: executorSource,
+    },
+  ] as const;
 
   for (const operationId of apiMissingRefs) {
     failures.push(
@@ -276,22 +305,15 @@ export const evaluateHeadlessSurfaceContract = async (
   }
 
   for (const marker of cannedRuntimeSuccess(
-    [httpSource, cliSource, workflowSource, executorSource].join("\n"),
+    runtimeSources.map(({ source }) => source).join("\n"),
   )) {
     failures.push(
       `runtime executor code returns canned success marker ${marker} instead of executeHeadlessOperation`,
     );
   }
 
-  for (const marker of cannedRegistryImport(workflowSource)) {
-    failures.push(
-      `tooling/workflow/src/index.ts imports forbidden canned registry ${marker}`,
-    );
-  }
-  for (const marker of cannedRegistryImport(cliSource)) {
-    failures.push(
-      `apps/cli/src/index.ts imports forbidden canned registry ${marker}`,
-    );
+  for (const failure of cannedRegistryImportFailures(runtimeSources)) {
+    failures.push(failure);
   }
 
   if (httpSource.includes("@maestro-template/workflow-tooling")) {

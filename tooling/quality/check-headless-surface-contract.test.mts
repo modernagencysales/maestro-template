@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expectDescriptorPassesAndFails } from "./src/check-test-helpers.mts";
 import {
   cannedRegistryImport,
+  cannedRegistryImportFailures,
   cannedRuntimeSuccess,
   descriptor,
   missingCliGeneratedRefUsage,
@@ -49,6 +50,20 @@ describe("check:headless-surface-contract", () => {
         'import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";',
       ),
     ).toEqual([]);
+  });
+
+  it("reports forbidden registry imports in workflow compatibility runtime code", () => {
+    expect(
+      cannedRegistryImportFailures([
+        {
+          path: "tooling/workflow/src/workflow-compat.ts",
+          source:
+            'import { templateRegistry } from "@maestro-template/template-core";',
+        },
+      ]),
+    ).toEqual([
+      "tooling/workflow/src/workflow-compat.ts imports forbidden canned registry templateRegistry",
+    ]);
   });
 
   it("reports canned runtime success markers", () => {
