@@ -1,8 +1,10 @@
 import { BlockNoteEditor } from "@blocknote/core";
-import { ProsemirrorSync } from "@convex-dev/prosemirror-sync";
+import { ProsemirrorSync, type SyncApi } from "@convex-dev/prosemirror-sync";
 import { useBlockNoteSync } from "@convex-dev/prosemirror-sync/blocknote";
+import type { Schema as ProseMirrorSchema } from "@tiptap/pm/model";
 
 declare const component: ConstructorParameters<typeof ProsemirrorSync>[0];
+declare const syncApiRef: SyncApi;
 const sync = new ProsemirrorSync(component);
 
 export const syncApi = sync.syncApi({
@@ -19,5 +21,12 @@ export const syncApi = sync.syncApi({
   },
 });
 
-void BlockNoteEditor.create;
-void useBlockNoteSync;
+const editor = BlockNoteEditor.create();
+const schema: ProseMirrorSchema<string, string> = editor.pmSchema;
+const blockNoteSync = useBlockNoteSync<BlockNoteEditor>(
+  syncApiRef,
+  "brainPage:page_1",
+);
+
+void schema;
+void blockNoteSync;

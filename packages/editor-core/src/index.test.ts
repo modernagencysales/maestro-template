@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import * as Schema from "effect/Schema";
 import {
+  EditorDocumentTarget,
   encodeEditorDocumentId,
   emptyBlockNoteDocument,
   parseEditorDocumentId,
@@ -24,6 +26,15 @@ describe("editor core", () => {
     expect(() => parseEditorDocumentId("doc_1")).toThrow(
       "Invalid editor document id",
     );
+  });
+
+  it("rejects empty ids through the exported target schema", () => {
+    expect(() =>
+      Schema.decodeUnknownSync(EditorDocumentTarget)({
+        kind: "brainPage",
+        id: "",
+      }),
+    ).toThrow();
   });
 
   it("returns a fresh empty document object", () => {
