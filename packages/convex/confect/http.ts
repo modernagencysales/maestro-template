@@ -2,7 +2,11 @@ import { buildOpenApiDocument } from "@maestro-template/workflow-tooling";
 import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";
 import { httpActionGeneric, httpRouter } from "convex/server";
 import { api } from "../convex/_generated/api";
-import { executeHeadlessOperation, type JsonValue } from "./manifest/executor";
+import {
+  executeHeadlessOperation,
+  type HeadlessExecutorRequest,
+  type JsonValue,
+} from "./manifest/executor";
 
 type ManifestFunction = (typeof confectManifest.functions)[number];
 
@@ -36,9 +40,39 @@ type TemplateApiRequestBody = {
   readonly idempotencyKey?: string;
 };
 
+type TemplateHttpFailure = {
+  readonly ok: false;
+  readonly error: {
+    readonly _tag: "ValidationFailed";
+    readonly message: string;
+  };
+};
+
+type ParsedTemplateApiRequestBody =
+  | { readonly ok: true; readonly body: TemplateApiRequestBody }
+  | TemplateHttpFailure;
+
 const operationRefs = {
   "brain.pages.createMarkdown": api.brain.pages.createMarkdown,
 } satisfies Record<string, unknown>;
+
+// Demo HTTP requests use the same reviewer-facing slug seeded in tenancy tests.
+const demoWorkspaceIdsBySlug = {
+  "acme-demo": "workspace_123",
+} as const satisfies Record<string, string>;
+
+const validationFailed = (message: string): TemplateHttpFailure => ({
+  ok: false,
+  error: {
+    _tag: "ValidationFailed",
+    message,
+  },
+});
+
+const workspaceSlugToId = (workspaceSlug: string): string | undefined =>
+  demoWorkspaceIdsBySlug[
+    workspaceSlug.trim() as keyof typeof demoWorkspaceIdsBySlug
+  ];
 
 export const securityHeaders = {
   "content-security-policy":
@@ -113,37 +147,121 @@ const htmlResponse = (html: string): Response =>
 
 const readJsonBody = async (
   request: Request,
-): Promise<TemplateApiRequestBody> => {
+): Promise<ParsedTemplateApiRequestBody> => {
   if (!request.body) {
-    return {};
+    return { ok: true, body: {} };
   }
 
   const contentType = request.headers.get("content-type") ?? "";
 
   if (!contentType.includes("application/json")) {
-    return {};
+    return { ok: true, body: {} };
   }
 
-  const value = (await request.json()) as unknown;
+  let value: unknown;
+  try {
+    value = await request.json();
+  } catch {
+    return validationFailed("Request body must be valid JSON.");
+  }
 
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
+    return { ok: true, body: {} };
   }
 
-  return value as TemplateApiRequestBody;
+  return { ok: true, body: value as TemplateApiRequestBody };
+};
+
+const requiredStringInput = (
+  operationId: string,
+  input: Record<string, JsonValue>,
+  field: string,
+): { readonly ok: true; readonly value: string } | TemplateHttpFailure => {
+  const value = input[field];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return validationFailed(
+      `Operation ${operationId} requires nonblank input.${field}.`,
+    );
+  }
+  return { ok: true, value };
 };
 
 const executorRequestFor = (
   operationId: string,
   body: TemplateApiRequestBody,
-) => ({
-  operationId,
-  surface: "api" as const,
-  input: body.input ?? {},
-  ...(body.idempotencyKey === undefined
-    ? {}
-    : { idempotencyKey: body.idempotencyKey }),
-});
+):
+  | { readonly ok: true; readonly request: HeadlessExecutorRequest }
+  | TemplateHttpFailure => {
+  const input = body.input ?? {};
+
+  if (operationId === "brain.pages.createMarkdown") {
+    if (
+      body.idempotencyKey?.trim() === "" ||
+      body.idempotencyKey === undefined
+    ) {
+      return validationFailed(
+        "Operation brain.pages.createMarkdown requires a nonblank idempotencyKey.",
+      );
+    }
+
+    const workspaceId =
+      typeof input.workspaceId === "string" && input.workspaceId.trim()
+        ? input.workspaceId.trim()
+        : body.workspaceSlug === undefined
+          ? undefined
+          : workspaceSlugToId(body.workspaceSlug);
+
+    if (!workspaceId) {
+      return validationFailed(
+        "Operation brain.pages.createMarkdown requires input.workspaceId or a known workspaceSlug.",
+      );
+    }
+
+    const slug = requiredStringInput(operationId, input, "slug");
+    if (!slug.ok) {
+      return slug;
+    }
+
+    const title = requiredStringInput(operationId, input, "title");
+    if (!title.ok) {
+      return title;
+    }
+
+    const markdown = requiredStringInput(operationId, input, "markdown");
+    if (!markdown.ok) {
+      return markdown;
+    }
+
+    return {
+      ok: true,
+      request: {
+        operationId,
+        surface: "api",
+        input: {
+          workspaceId,
+          slug: slug.value,
+          title: title.value,
+          markdown: markdown.value,
+        },
+        ...(body.idempotencyKey === undefined
+          ? {}
+          : { idempotencyKey: body.idempotencyKey }),
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    request: {
+      operationId,
+      surface: "api",
+      input,
+      ...(body.idempotencyKey === undefined
+        ? {}
+        : { idempotencyKey: body.idempotencyKey }),
+    },
+  };
+};
 
 export const handleTemplateHttpRequest = async (
   ctx: HeadlessHttpCtx,
@@ -195,7 +313,18 @@ export const handleTemplateHttpRequest = async (
       });
     }
 
-    const body = await readJsonBody(request);
+    const parsedBody = await readJsonBody(request);
+    if (!parsedBody.ok) {
+      return jsonResponse(parsedBody);
+    }
+
+    const executorRequest = executorRequestFor(
+      apiEntry.operationId,
+      parsedBody.body,
+    );
+    if (!executorRequest.ok) {
+      return jsonResponse(executorRequest);
+    }
 
     return jsonResponse(
       await executeHeadlessOperation(
@@ -205,9 +334,7 @@ export const handleTemplateHttpRequest = async (
           runMutation: (ref, input) => ctx.runMutation(ref, input),
           runAction: (ref, input) => ctx.runAction(ref, input),
         },
-        {
-          ...executorRequestFor(apiEntry.operationId, body),
-        },
+        executorRequest.request,
       ),
     );
   }

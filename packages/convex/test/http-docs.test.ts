@@ -140,7 +140,7 @@ describe("template HTTP docs routes", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           workspaceSlug: "acme-demo",
-          input: { title: "A note", markdown: "# A note" },
+          input: { slug: "a-note", title: "A note", markdown: "# A note" },
           idempotencyKey: "brain-page-example-001",
         }),
       }),
@@ -159,11 +159,60 @@ describe("template HTTP docs routes", () => {
     expect(calls[0]).toMatchObject([
       expect.anything(),
       {
+        workspaceId: "workspace_123",
+        slug: "a-note",
         title: "A note",
         markdown: "# A note",
         idempotencyKey: "brain-page-example-001",
       },
     ]);
+  });
+
+  it("fails closed when generated API request fields cannot be mapped", async () => {
+    const body = await readJson(
+      await handleTemplateHttpRequest(
+        noopCtx,
+        new Request("https://template.local/api/brain.pages.createMarkdown", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            workspaceSlug: "unknown-workspace",
+            input: { slug: "a-note", title: "A note", markdown: "# A note" },
+            idempotencyKey: "brain-page-example-001",
+          }),
+        }),
+      ),
+    );
+
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        _tag: "ValidationFailed",
+        message:
+          "Operation brain.pages.createMarkdown requires input.workspaceId or a known workspaceSlug.",
+      },
+    });
+  });
+
+  it("returns typed validation errors for malformed JSON requests", async () => {
+    const body = await readJson(
+      await handleTemplateHttpRequest(
+        noopCtx,
+        new Request("https://template.local/api/brain.pages.createMarkdown", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{",
+        }),
+      ),
+    );
+
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        _tag: "ValidationFailed",
+        message: "Request body must be valid JSON.",
+      },
+    });
   });
 
   it("returns typed validation errors for generated API operations", async () => {
