@@ -81,7 +81,7 @@ const buildSourceGroundedBriefPresentation = (
   sourceTitles: result.sourceTitles,
 });
 
-const runSourceGroundedBriefTool = (
+const runFakeSourceGroundedBriefTool = (
   input: SourceGroundedBriefInput,
 ): SourceGroundedBriefResult =>
   runFakeSourceGroundedBrief({
@@ -97,24 +97,20 @@ const runSourceGroundedBriefTool = (
 
 const buildSourceGroundedBriefExecution = (
   input: SourceGroundedBriefInput,
-  toolName: SourceGroundedBriefTool["name"],
-  present: SourceGroundedBriefTool["present"],
 ): ModelToolExecution => {
-  const result = runSourceGroundedBriefTool(input);
+  const result = runFakeSourceGroundedBriefTool(input);
 
   return {
-    assistantMessage: `I created a source-grounded brief using ${toolName}.`,
-    presentation: present(result),
+    assistantMessage: `I created a source-grounded brief using ${sourceGroundedBriefTool.name}.`,
+    presentation: sourceGroundedBriefTool.present(result),
   };
 };
 
 const prepareSourceGroundedBriefInvocation = (
   input: SourceGroundedBriefInput,
-  toolName: SourceGroundedBriefTool["name"],
-  present: SourceGroundedBriefTool["present"],
 ): PreparedModelToolInvocation => ({
   idempotencyKey: input.idempotencyKey,
-  execute: () => buildSourceGroundedBriefExecution(input, toolName, present),
+  execute: () => buildSourceGroundedBriefExecution(input),
 });
 
 export const sourceGroundedBriefTool: SourceGroundedBriefTool = {
@@ -134,11 +130,7 @@ export const sourceGroundedBriefTool: SourceGroundedBriefTool = {
 
     return {
       ok: true,
-      invocation: prepareSourceGroundedBriefInvocation(
-        decoded.input,
-        sourceGroundedBriefTool.name,
-        sourceGroundedBriefTool.present,
-      ),
+      invocation: prepareSourceGroundedBriefInvocation(decoded.input),
     };
   },
   present: buildSourceGroundedBriefPresentation,
