@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import workflowRunEvents from "../confect/tables/workflowRunEvents";
 import workflowRunEvidenceSnapshots from "../confect/tables/workflowRunEvidenceSnapshots";
 import workflowRunContextManifests from "../confect/tables/workflowRunContextManifests";
+import workflowRunLinks from "../confect/tables/workflowRunLinks";
 import workflowRuns, { WorkflowRunRow } from "../confect/tables/workflowRuns";
 import workflowStageRuns from "../confect/tables/workflowStageRuns";
 import {
@@ -47,7 +48,8 @@ const validGraph = {
       sourceNodeId: "brief",
       targetNodeId: "receipt",
       condition: {
-        expression: "result.trustClaim == 'source-backed-no-default-rag'",
+        expression:
+          "context.brief.trustClaim === 'source-backed-no-default-rag'",
       },
     },
   ],
@@ -131,6 +133,27 @@ describe("workflow graph model", () => {
     ]);
   });
 
+  it("rejects invalid delay config", () => {
+    expect(
+      validateWorkflowGraph({
+        ...validGraph,
+        nodes: [
+          {
+            ...firstNode,
+            kind: "delay",
+            delayMs: 0,
+          },
+          ...validGraph.nodes.slice(1),
+        ],
+      }),
+    ).toContainEqual(
+      new WorkflowGraphValidationError.InvalidDelayConfig({
+        nodeId: "source",
+        field: "delayMs",
+      }),
+    );
+  });
+
   it("rejects invalid joins", () => {
     expect(
       validateWorkflowGraph({
@@ -180,11 +203,24 @@ describe("workflow graph model", () => {
       by_workspace_status: ["workspaceId", "status"],
       by_workflow_version: ["workflowId", "workflowVersion"],
       by_idempotency_key: ["workspaceId", "idempotencyKey"],
+      by_component_workflow: ["componentWorkflowId"],
+      by_workspace_component_workflow: ["workspaceId", "componentWorkflowId"],
     });
     expect(workflowStageRuns.indexes).toMatchObject({
       by_run: ["workflowRunId"],
       by_run_node: ["workflowRunId", "nodeId"],
       by_status: ["status"],
+      by_component_workflow_order: ["componentWorkflowId", "order"],
+      by_component_workflow_stage_attempt: [
+        "componentWorkflowId",
+        "stageKey",
+        "attemptNumber",
+      ],
+    });
+    expect(workflowRunLinks.indexes).toMatchObject({
+      by_workspace_parent: ["workspaceId", "parentWorkflowId"],
+      by_workspace_child: ["workspaceId", "childWorkflowId"],
+      by_workspace_idempotency: ["workspaceId", "idempotencyKey"],
     });
     expect(workflowRunEvents.indexes).toMatchObject({
       by_run_sequence: ["workflowRunId", "sequence"],
