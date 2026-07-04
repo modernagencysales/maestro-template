@@ -156,6 +156,15 @@ Feature components normalize Confect and Convex query/mutation results through
 directly or through feature presenters; they should not branch on raw Confect,
 Convex, TanStack Query, or Effect internals.
 
+## Effect State Policy
+
+The detailed frontend Effect policy lives in
+`docs/template/frontend-effect-state.md`. In short: TanStack Router/Start is the
+current routing shell, Convex/Confect hooks are the default server-state model,
+TanStack Query remains only for current router/Convex integration and legacy
+cache surfaces, and Effect Atom is an opt-in adapter for complex local client
+state rather than the template default.
+
 ## Navigation Model
 
 The template workspace registry should include generic routes:
