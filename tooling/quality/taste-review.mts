@@ -469,7 +469,9 @@ async function callJudgeText(userMessage: string): Promise<string> {
   }
 }
 
-function changedLinesBlock(ranges: readonly ChangedRange[] | null): string {
+export function changedLinesBlock(
+  ranges: readonly ChangedRange[] | null,
+): string {
   if (ranges === null || ranges.length === 0) return "";
   const list = ranges
     .map((range) =>
@@ -478,7 +480,7 @@ function changedLinesBlock(ranges: readonly ChangedRange[] | null): string {
         : `${String(range.start)}-${String(range.end)}`,
     )
     .join(", ");
-  return `\n\n<changed-lines>\nThis PR added or modified these line ranges; review only these: ${list}\n</changed-lines>`;
+  return `\n\n<changed-lines>\nChanged new-side line ranges: ${list}\n</changed-lines>`;
 }
 
 export async function callTasteJudge(

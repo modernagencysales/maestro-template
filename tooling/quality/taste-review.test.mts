@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   callTasteJudge,
+  changedLinesBlock,
   formatTasteVerdict,
   infrastructureBlockedTasteVerdict,
   isLineInRanges,
@@ -416,6 +417,17 @@ describe("taste review concurrency", () => {
 });
 
 describe("taste diff scoping", () => {
+  it("renders changed-line metadata without imperative reviewer instructions", () => {
+    const block = changedLinesBlock([
+      { start: 5, end: 10 },
+      { start: 42, end: 42 },
+    ]);
+
+    expect(block).toContain("<changed-lines>");
+    expect(block).toContain("5-10, 42");
+    expect(block).not.toMatch(/review only|ignore|return pass/i);
+  });
+
   it("parses new-side line ranges from unified hunk headers", () => {
     const diff = [
       "diff --git a/x.ts b/x.ts",
