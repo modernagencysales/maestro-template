@@ -79,6 +79,6 @@ inspect the generated diff, and prove no stale generated output remains.
 
 Add one row per completed phase.
 
-| Date       | Phase       | Command                                             | Result                                                                                             |
-| ---------- | ----------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 2026-07-04 | B / Task 11 | `rtk rg -n "Date\\.now\\(" packages/convex/confect` | Database-backed impls use Effect `Clock.currentTimeMillis`; no demo fixture time constants remain. |
+| Date       | Phase       | Command                                             | Result                                                                                                                 |
+| ---------- | ----------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-04 | B / Task 11 | `rtk rg -n "Date\\.now\\(" packages/convex/confect` | Fixed wall-clock `Date.now()` usage was removed from persisted impl paths; demo fixtures still use relative durations. |
