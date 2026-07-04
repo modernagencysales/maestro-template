@@ -35,6 +35,12 @@ export default defineConfig({
       "@maestro-template/template-core": fileURLToPath(
         new URL("../../packages/template-core/src/index.ts", import.meta.url),
       ),
+      "@maestro-template/workflow-ui/workflowCanvasState": fileURLToPath(
+        new URL(
+          "../../packages/workflow-ui/src/workflowCanvasState.ts",
+          import.meta.url,
+        ),
+      ),
       "@maestro-template/workflow-ui": fileURLToPath(
         new URL("../../packages/workflow-ui/src/index.tsx", import.meta.url),
       ),
