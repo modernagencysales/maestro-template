@@ -87,6 +87,37 @@ describe("TemplateRuntimeConfig", () => {
     });
   });
 
+  it("loads ambient process env when no provider is supplied", async () => {
+    const previousRuntimeMode = process.env.TEMPLATE_RUNTIME_MODE;
+    const previousPublicBaseUrl = process.env.TEMPLATE_PUBLIC_BASE_URL;
+
+    try {
+      process.env.TEMPLATE_RUNTIME_MODE = "live";
+      process.env.TEMPLATE_PUBLIC_BASE_URL = "https://ambient.example";
+
+      await expect(
+        Effect.runPromise(
+          runWithTemplateRuntimeConfig(loadTemplateRuntimeConfig),
+        ),
+      ).resolves.toEqual({
+        runtimeMode: "live",
+        publicBaseUrl: "https://ambient.example",
+      });
+    } finally {
+      if (previousRuntimeMode === undefined) {
+        delete process.env.TEMPLATE_RUNTIME_MODE;
+      } else {
+        process.env.TEMPLATE_RUNTIME_MODE = previousRuntimeMode;
+      }
+
+      if (previousPublicBaseUrl === undefined) {
+        delete process.env.TEMPLATE_PUBLIC_BASE_URL;
+      } else {
+        process.env.TEMPLATE_PUBLIC_BASE_URL = previousPublicBaseUrl;
+      }
+    }
+  });
+
   it("loads provider overrides from the Effect config provider", async () => {
     const provider = ConfigProvider.fromMap(
       new Map([

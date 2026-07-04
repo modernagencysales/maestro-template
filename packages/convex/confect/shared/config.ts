@@ -43,13 +43,17 @@ export const loadTemplateRuntimeConfig = Effect.gen(function* () {
 
 export const runWithTemplateRuntimeConfig = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  provider: ConfigProvider.ConfigProvider = ConfigProvider.fromMap(new Map()),
+  provider?: ConfigProvider.ConfigProvider,
 ): Effect.Effect<
   A,
   E | ConfigError.ConfigError,
   Exclude<R, TemplateRuntimeConfig>
-> =>
-  effect.pipe(
-    Effect.provide(TemplateRuntimeConfigLive),
-    Effect.withConfigProvider(provider),
-  );
+> => {
+  const providedEffect = effect.pipe(Effect.provide(TemplateRuntimeConfigLive));
+
+  if (provider === undefined) {
+    return providedEffect;
+  }
+
+  return providedEffect.pipe(Effect.withConfigProvider(provider));
+};
