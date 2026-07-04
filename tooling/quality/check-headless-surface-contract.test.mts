@@ -111,6 +111,18 @@ describe("check:headless-surface-contract", () => {
     expect(missingHttpExecutorDispatch(source)).toBe(false);
   });
 
+  it("rejects API mappings with regex-compatible but wrong operation IDs", () => {
+    const source = `
+      const operationRefs = {
+        "brain-pages-createMarkdown": api.brain.pages.createMarkdown,
+      };
+    `;
+
+    expect(
+      missingHttpGeneratedRefMapping(["brain.pages.createMarkdown"], source),
+    ).toContain("brain.pages.createMarkdown");
+  });
+
   it("rejects inert CLI mapping constants", () => {
     const unusedMappingSource = `
       export const generatedCliOperationRefs = {
@@ -142,6 +154,21 @@ describe("check:headless-surface-contract", () => {
     expect(
       missingCliGeneratedRefUsage(["brain.pages.createMarkdown"], source),
     ).toEqual([]);
+  });
+
+  it("rejects CLI mappings with regex-compatible but wrong operation IDs", () => {
+    const source = `
+      export const generatedCliOperationRefs = {
+        "brain-pages-createMarkdown": "brain.pages.createMarkdown",
+      };
+
+      const operationId = generatedCliOperationRefs[maybeId];
+      return runTemplateApiOperation(operationId, {});
+    `;
+
+    expect(
+      missingCliGeneratedRefUsage(["brain.pages.createMarkdown"], source),
+    ).toContain("brain.pages.createMarkdown");
   });
 
   it("requires MCP mappings for both tool listing and call dispatch", () => {
@@ -183,5 +210,24 @@ describe("check:headless-surface-contract", () => {
     expect(
       missingMcpGeneratedRefUsage(["brain.pages.createMarkdown"], source),
     ).toEqual([]);
+  });
+
+  it("rejects MCP mappings with regex-compatible but wrong operation IDs", () => {
+    const source = `
+      export const generatedMcpOperationRefs = {
+        "brain-pages-createMarkdown": "template.brain.pages.createMarkdown",
+      };
+
+      const tools = entries.map((entry) => ({
+        name: generatedMcpOperationRefs[entry.operationId],
+      }));
+      const operation = entries.find(
+        (candidate) => generatedMcpOperationRefs[candidate.operationId] === toolName,
+      );
+    `;
+
+    expect(
+      missingMcpGeneratedRefUsage(["brain.pages.createMarkdown"], source),
+    ).toContain("brain.pages.createMarkdown");
   });
 });

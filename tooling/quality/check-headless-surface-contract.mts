@@ -69,13 +69,16 @@ const missingLiteralGeneratedRefMapping = (
       !source.includes(`\`${operationId}\``),
   );
 
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const objectMappingPattern = (
   objectName: string,
   operationId: string,
   mappedValue: string,
 ): RegExp =>
   new RegExp(
-    `\\b${objectName}\\b[\\s\\S]*?["'\`]${operationId}["'\`]\\s*:\\s*${mappedValue}`,
+    `\\b${objectName}\\b[\\s\\S]*?["'\`]${escapeRegExp(operationId)}["'\`]\\s*:\\s*${mappedValue}`,
   );
 
 export const missingHttpGeneratedRefMapping = (
