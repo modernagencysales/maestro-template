@@ -86,10 +86,23 @@ const parseJsonRequestBody = async (
 };
 
 const templateApiRequestBodyFrom = (value: unknown): TemplateApiRequestBody => {
-  const isRecord =
-    value !== null && typeof value === "object" && !Array.isArray(value);
-  return isRecord ? (value as TemplateApiRequestBody) : {};
+  if (!isObjectRecord(value)) return {};
+
+  return {
+    ...(typeof value.workspaceSlug === "string"
+      ? { workspaceSlug: value.workspaceSlug }
+      : {}),
+    ...(isObjectRecord(value.input)
+      ? { input: value.input as Record<string, JsonValue> }
+      : {}),
+    ...(typeof value.idempotencyKey === "string"
+      ? { idempotencyKey: value.idempotencyKey }
+      : {}),
+  };
 };
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 
 export const executorRequestFor = (
   operationId: string,

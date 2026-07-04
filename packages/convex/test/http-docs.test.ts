@@ -338,6 +338,54 @@ describe("template HTTP docs routes", () => {
     });
   });
 
+  it("returns typed validation errors for non-string API envelope fields", async () => {
+    const invalidIdempotencyKey = await readJson(
+      await handleTemplateHttpRequest(
+        noopCtx,
+        new Request("https://template.local/api/brain.pages.createMarkdown", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            workspaceSlug: "acme-demo",
+            input: { slug: "a-note", title: "A note", markdown: "# A note" },
+            idempotencyKey: 42,
+          }),
+        }),
+      ),
+    );
+    const invalidWorkspaceSlug = await readJson(
+      await handleTemplateHttpRequest(
+        noopCtx,
+        new Request("https://template.local/api/brain.pages.createMarkdown", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            workspaceSlug: true,
+            input: { slug: "a-note", title: "A note", markdown: "# A note" },
+            idempotencyKey: "brain-page-example-001",
+          }),
+        }),
+      ),
+    );
+
+    expect(invalidIdempotencyKey).toEqual({
+      ok: false,
+      error: {
+        _tag: "ValidationFailed",
+        message:
+          "Operation brain.pages.createMarkdown requires a nonblank idempotencyKey.",
+      },
+    });
+    expect(invalidWorkspaceSlug).toEqual({
+      ok: false,
+      error: {
+        _tag: "ValidationFailed",
+        message:
+          "Operation brain.pages.createMarkdown requires input.workspaceId or a known workspaceSlug.",
+      },
+    });
+  });
+
   it("returns typed route errors for invalid HTTP requests", async () => {
     const method = await readJson(
       await handleTemplateHttpRequest(
