@@ -3,17 +3,22 @@
 Use the agent generator:
 
 ```bash
-pnpm template:add-agent-seat -- --name workflow_architect
+pnpm template:add-agent -- --name workflow_architect --write
 ```
+
+`pnpm template:add-agent-seat` remains an alias for older task briefs.
 
 ## Files Created
 
-- Agent seat metadata.
-- Tool grant manifest.
-- Prompt and policy refs.
-- Conversation/thread Confect functions.
-- Web agent surface.
-- Tests and docs.
+- `packages/convex/confect/agents/<name>.spec.ts`
+- `packages/convex/confect/agents/<name>.impl.ts`
+- `packages/convex/confect/agents/<name>.tools.ts`
+- `packages/convex/test/<name>.agent.test.ts`
+- `docs/template/generated/agents/<name>.md`
+
+Generated agent seats are web-facing by default with `surfaces: ["web"]`. They
+do not create API, CLI, MCP, `.headless.json`, or headless registry exposure
+until a separate headless contract review approves it.
 
 ## Tests
 
@@ -29,4 +34,5 @@ pnpm template:add-agent-seat -- --name workflow_architect
 
 - `pnpm --dir packages/convex test agents`
 - `pnpm --dir apps/web test src/features/agents`
-- `pnpm check:headless-surface-contract` when exposed.
+- `pnpm check:headless-surface-contract` only after a separate headless exposure
+  task adds API, CLI, or MCP surfaces.

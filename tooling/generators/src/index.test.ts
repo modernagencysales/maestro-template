@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  buildAgentFiles,
   buildBlueprintCatalog,
   buildCapabilityFiles,
   buildCapabilityPromotionFiles,
@@ -447,6 +448,8 @@ describe("template app factory generators", () => {
     expect(result.stdout).toContain("template:seed-demo");
     expect(result.stdout).toContain("template:handoff");
     expect(result.stdout).toContain("template:add-client-domain");
+    expect(result.stdout).toContain("template:add-agent");
+    expect(result.stdout).toContain("template:add-agent-seat");
   });
 
   it("rejects planned blueprints with a useful error", () => {
@@ -820,6 +823,120 @@ describe("template app factory generators", () => {
     }
   });
 
+  it("builds web-only agent seat generator files", () => {
+    const generated = buildAgentFiles({
+      name: "workflow architect",
+      description: "Drafts reviewed workflow plans from approved context.",
+    });
+
+    expect(generated).toMatchObject({
+      name: "workflowArchitect",
+      pascalName: "WorkflowArchitect",
+      surfaces: ["web"],
+      headlessExposure: false,
+    });
+    expect(generated.files.map((file) => file.path)).toEqual([
+      "packages/convex/confect/agents/workflowArchitect.spec.ts",
+      "packages/convex/confect/agents/workflowArchitect.impl.ts",
+      "packages/convex/confect/agents/workflowArchitect.tools.ts",
+      "packages/convex/test/workflowArchitect.agent.test.ts",
+      "docs/template/generated/agents/workflowArchitect.md",
+    ]);
+    expect(
+      generated.files.some((file) => file.path.endsWith(".headless.json")),
+    ).toBe(false);
+
+    const spec = generated.files[0]?.content ?? "";
+    const impl = generated.files[1]?.content ?? "";
+    const tools = generated.files[2]?.content ?? "";
+    const test = generated.files[3]?.content ?? "";
+    const docs = generated.files[4]?.content ?? "";
+
+    expect(spec).toContain('surfaces: ["web"]');
+    expect(spec).toContain('agentSeat: "web-facing"');
+    expect(spec).toContain("headlessExposure: false");
+    expect(spec).toContain("FunctionSpec.publicMutation");
+    expect(spec).toContain("FunctionSpec.publicQuery");
+    expect(spec).not.toContain('["api", "cli", "mcp"]');
+    expect(spec).not.toContain(".headless.json");
+    expect(impl).toContain("No model provider or external tool was called.");
+    expect(impl).not.toContain("createAgentRuntime");
+    expect(tools).toContain(
+      "workflowArchitectTools: readonly WorkflowArchitectTool[] = []",
+    );
+    expect(test).toContain("headlessExposure: false");
+    expect(docs).toContain('Surfaces: `["web"]`');
+    expect(docs).toContain("does not create API, CLI, MCP");
+    expect(docs).toContain("`.headless.json`");
+    expect(docs).toContain("Keep API, CLI, and MCP exposure out");
+  });
+
+  it("writes generated agent files through the CLI and keeps the alias equivalent", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "maestro-template-agent-"));
+
+    try {
+      const result = runGeneratorCli(
+        [
+          "add-agent",
+          "--name",
+          "workflow architect",
+          "--description",
+          "Drafts reviewed workflow plans from approved context.",
+          "--write",
+        ],
+        cwd,
+      );
+      const aliasResult = runGeneratorCli([
+        "add-agent-seat",
+        "--name",
+        "workflow architect",
+        "--description",
+        "Drafts reviewed workflow plans from approved context.",
+      ]);
+      const parsed = JSON.parse(result.stdout) as {
+        readonly files: readonly { readonly path: string }[];
+        readonly surfaces: readonly string[];
+        readonly headlessExposure: boolean;
+      };
+      const aliasParsed = JSON.parse(aliasResult.stdout) as {
+        readonly files: readonly { readonly path: string }[];
+        readonly surfaces: readonly string[];
+        readonly headlessExposure: boolean;
+      };
+      const specPath = join(
+        cwd,
+        "packages/convex/confect/agents/workflowArchitect.spec.ts",
+      );
+      const toolsPath = join(
+        cwd,
+        "packages/convex/confect/agents/workflowArchitect.tools.ts",
+      );
+      const docsPath = join(
+        cwd,
+        "docs/template/generated/agents/workflowArchitect.md",
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(aliasResult.exitCode).toBe(0);
+      expect(parsed.files.map((file) => file.path)).toEqual(
+        aliasParsed.files.map((file) => file.path),
+      );
+      expect(parsed.surfaces).toEqual(["web"]);
+      expect(aliasParsed.surfaces).toEqual(["web"]);
+      expect(parsed.headlessExposure).toBe(false);
+      expect(aliasParsed.headlessExposure).toBe(false);
+      expect(existsSync(specPath)).toBe(true);
+      expect(existsSync(toolsPath)).toBe(true);
+      expect(existsSync(docsPath)).toBe(true);
+      expect(readFileSync(specPath, "utf8")).toContain('surfaces: ["web"]');
+      expect(readFileSync(docsPath, "utf8")).not.toContain(
+        "headless registry entry",
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("exposes a dedicated generated workflow output smoke gate", () => {
     const rootPackage = JSON.parse(
       readFileSync(join(repoRoot, "package.json"), "utf8"),
@@ -831,6 +948,12 @@ describe("template app factory generators", () => {
 
     expect(rootPackage.scripts?.[workflowOutputSmokeScriptName]).toBe(
       "tsx tooling/generators/src/workflow-output-smoke.ts",
+    );
+    expect(rootPackage.scripts?.["template:add-agent"]).toBe(
+      "tsx tooling/generators/src/index.ts add-agent",
+    );
+    expect(rootPackage.scripts?.["template:add-agent-seat"]).toBe(
+      "tsx tooling/generators/src/index.ts add-agent-seat",
     );
     expect(existsSync(smokeScriptPath)).toBe(true);
     expect(smokeWorkflowName).toBe("generatedWorkflowSmoke");

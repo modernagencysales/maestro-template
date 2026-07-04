@@ -176,6 +176,21 @@ export type WorkflowGeneratorResult = {
   readonly files: readonly GeneratedFile[];
 };
 
+export type AgentGeneratorOptions = {
+  readonly name: string;
+  readonly description?: string;
+  readonly write?: boolean;
+};
+
+export type AgentGeneratorResult = {
+  readonly name: string;
+  readonly pascalName: string;
+  readonly surfaces: readonly ["web"];
+  readonly headlessExposure: false;
+  readonly files: readonly GeneratedFile[];
+  readonly followUp: readonly string[];
+};
+
 export type PromotionGeneratorOptions = {
   readonly name: string;
   readonly description?: string;
@@ -1221,6 +1236,393 @@ ${description}
     pascalName,
     exposure,
     files,
+  };
+};
+
+export const buildAgentFiles = (
+  options: AgentGeneratorOptions,
+): AgentGeneratorResult => {
+  const name = camelCase(options.name);
+  const pascalName = pascalCase(options.name);
+  const description =
+    options.description ??
+    `Generated ${name} agent seat. Keep the default web surface deterministic until tool grants are reviewed.`;
+  const manifestName = `${name}AgentManifest`;
+  const messageName = `${pascalName}AgentMessage`;
+  const startArgsName = `${pascalName}StartThreadArgs`;
+  const continueArgsName = `${pascalName}ContinueThreadArgs`;
+  const listArgsName = `${pascalName}ListThreadMessagesArgs`;
+  const startReturnName = `${pascalName}StartThreadReturn`;
+  const continueReturnName = `${pascalName}ContinueThreadReturn`;
+  const toolsName = `${name}Tools`;
+  const followUp = [
+    "Wire the generated web agent seat into the app route or feature module.",
+    "Review tool grants before adding model-call or provider-backed behavior.",
+    "Run Confect codegen before importing generated refs from runtime surfaces.",
+  ] as const;
+  const files: readonly GeneratedFile[] = [
+    {
+      path: `packages/convex/confect/agents/${name}.spec.ts`,
+      content: `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as S from "effect/Schema";
+
+export const ${manifestName} = {
+  agent: "${name}",
+  displayName: "${pascalName}",
+  description: ${JSON.stringify(description)},
+  surfaces: ["web"],
+  agentSeat: "web-facing",
+  headlessExposure: false,
+  toolGrantPolicy: "none-by-default",
+} as const;
+
+export const ${startArgsName} = S.Struct({
+  workspaceId: S.String.pipe(S.minLength(1)),
+  userId: S.String.pipe(S.minLength(1)),
+  firstMessage: S.String.pipe(S.minLength(1)),
+});
+
+export const ${continueArgsName} = S.Struct({
+  workspaceId: S.String.pipe(S.minLength(1)),
+  userId: S.String.pipe(S.minLength(1)),
+  threadId: S.String.pipe(S.minLength(1)),
+  message: S.String.pipe(S.minLength(1)),
+  idempotencyKey: S.String.pipe(S.minLength(1)),
+});
+
+export const ${listArgsName} = S.Struct({
+  workspaceId: S.String.pipe(S.minLength(1)),
+  userId: S.String.pipe(S.minLength(1)),
+  threadId: S.String.pipe(S.minLength(1)),
+});
+
+export const ${messageName} = S.Struct({
+  id: S.String,
+  role: S.Literal("user", "assistant", "tool"),
+  content: S.String,
+  createdAt: S.Number,
+});
+
+export const ${startReturnName} = S.Struct({
+  threadId: S.String,
+  agent: S.Literal("${name}"),
+  surface: S.Literal("web"),
+  messages: S.Array(${messageName}),
+});
+
+export const ${continueReturnName} = S.Struct({
+  threadId: S.String,
+  agent: S.Literal("${name}"),
+  surface: S.Literal("web"),
+  messages: S.Array(${messageName}),
+  toolCallCount: S.Number,
+});
+
+export namespace ${pascalName}AgentError {
+  export class NoWorkspaceAccess extends S.TaggedError<NoWorkspaceAccess>()(
+    "NoWorkspaceAccess",
+    {
+      workspaceId: S.String,
+      userId: S.String,
+    },
+  ) {}
+
+  export class ValidationFailed extends S.TaggedError<ValidationFailed>()(
+    "ValidationFailed",
+    {
+      field: S.String,
+      message: S.String,
+    },
+  ) {}
+
+  export const Schema = S.Union(NoWorkspaceAccess, ValidationFailed);
+}
+
+const startThread = FunctionSpec.publicMutation({
+  name: "startThread",
+  args: () => ${startArgsName},
+  returns: () => ${startReturnName},
+  error: () => ${pascalName}AgentError.Schema,
+});
+
+const continueThread = FunctionSpec.publicMutation({
+  name: "continueThread",
+  args: () => ${continueArgsName},
+  returns: () => ${continueReturnName},
+  error: () => ${pascalName}AgentError.Schema,
+});
+
+const listThreadMessages = FunctionSpec.publicQuery({
+  name: "listThreadMessages",
+  args: () => ${listArgsName},
+  returns: () => S.Array(${messageName}),
+  error: () => ${pascalName}AgentError.Schema,
+});
+
+export default GroupSpec.make()
+  .addFunction(startThread)
+  .addFunction(continueThread)
+  .addFunction(listThreadMessages);
+`,
+    },
+    {
+      path: `packages/convex/confect/agents/${name}.impl.ts`,
+      content: `import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "../_generated/schema";
+import ${name}Agent, {
+  ${pascalName}AgentError,
+  ${manifestName},
+} from "./${name}.spec";
+import { ${toolsName} } from "./${name}.tools";
+
+const fakeMemberships = [
+  {
+    workspaceId: "workspace_123",
+    userId: "user_123",
+    status: "active",
+  },
+] as const;
+
+const hasWorkspaceAccess = (input: {
+  readonly workspaceId: string;
+  readonly userId: string;
+}): boolean =>
+  fakeMemberships.some(
+    (membership) =>
+      membership.workspaceId === input.workspaceId &&
+      membership.userId === input.userId &&
+      membership.status === "active",
+  );
+
+const requireWorkspaceAccess = (input: {
+  readonly workspaceId: string;
+  readonly userId: string;
+}) =>
+  hasWorkspaceAccess(input)
+    ? undefined
+    : new ${pascalName}AgentError.NoWorkspaceAccess(input);
+
+const startThread = FunctionImpl.make(
+  databaseSchema,
+  ${name}Agent,
+  "startThread",
+  ({ workspaceId, userId, firstMessage }) => {
+    const accessError = requireWorkspaceAccess({ workspaceId, userId });
+
+    if (accessError) {
+      return Effect.fail(accessError);
+    }
+
+    return Effect.succeed({
+      threadId: \`thread_\${workspaceId}_\${userId}_${name}\`,
+      agent: ${manifestName}.agent,
+      surface: "web" as const,
+      messages: [
+        {
+          id: "msg_user_001",
+          role: "user" as const,
+          content: firstMessage,
+          createdAt: 1,
+        },
+        {
+          id: "msg_agent_001",
+          role: "assistant" as const,
+          content:
+            "${pascalName} is ready in fake mode. Review web UX and tool grants before adding provider calls.",
+          createdAt: 2,
+        },
+      ],
+    });
+  },
+);
+
+const continueThread = FunctionImpl.make(
+  databaseSchema,
+  ${name}Agent,
+  "continueThread",
+  ({ workspaceId, userId, threadId, message }) => {
+    const accessError = requireWorkspaceAccess({ workspaceId, userId });
+
+    if (accessError) {
+      return Effect.fail(accessError);
+    }
+
+    return Effect.succeed({
+      threadId,
+      agent: ${manifestName}.agent,
+      surface: "web" as const,
+      messages: [
+        {
+          id: "msg_user_continue",
+          role: "user" as const,
+          content: message,
+          createdAt: 3,
+        },
+        {
+          id: "msg_agent_continue",
+          role: "assistant" as const,
+          content:
+            "Deterministic scaffold response. No model provider or external tool was called.",
+          createdAt: 4,
+        },
+      ],
+      toolCallCount: ${toolsName}.length,
+    });
+  },
+);
+
+const listThreadMessages = FunctionImpl.make(
+  databaseSchema,
+  ${name}Agent,
+  "listThreadMessages",
+  ({ workspaceId, userId, threadId }) => {
+    const accessError = requireWorkspaceAccess({ workspaceId, userId });
+
+    if (accessError) {
+      return Effect.fail(accessError);
+    }
+
+    return Effect.succeed([
+      {
+        id: \`\${threadId}_summary\`,
+        role: "assistant" as const,
+        content:
+          "This generated web-facing agent seat uses fake-safe local behavior by default.",
+        createdAt: 1,
+      },
+    ]);
+  },
+);
+
+export default GroupImpl.make(databaseSchema, ${name}Agent).pipe(
+  Layer.provide(startThread),
+  Layer.provide(continueThread),
+  Layer.provide(listThreadMessages),
+  GroupImpl.finalize,
+);
+`,
+    },
+    {
+      path: `packages/convex/confect/agents/${name}.tools.ts`,
+      content: `export type ${pascalName}Tool = {
+  readonly name: string;
+  readonly grantId: string;
+  readonly description: string;
+};
+
+export const ${toolsName}: readonly ${pascalName}Tool[] = [];
+
+export const list${pascalName}ToolNames = (): readonly string[] =>
+  ${toolsName}.map((tool) => tool.name);
+`,
+    },
+    {
+      path: `packages/convex/test/${name}.agent.test.ts`,
+      content: `import * as Schema from "effect/Schema";
+import { describe, expect, it } from "vitest";
+import ${name}AgentImpl from "../confect/agents/${name}.impl";
+import ${name}Agent, {
+  ${messageName},
+  ${continueArgsName},
+  ${manifestName},
+  ${startArgsName},
+} from "../confect/agents/${name}.spec";
+import { ${toolsName}, list${pascalName}ToolNames } from "../confect/agents/${name}.tools";
+
+describe("${name} generated agent seat", () => {
+  it("declares web-only agent metadata", () => {
+    expect(${manifestName}).toMatchObject({
+      agent: "${name}",
+      surfaces: ["web"],
+      agentSeat: "web-facing",
+      headlessExposure: false,
+      toolGrantPolicy: "none-by-default",
+    });
+  });
+
+  it("declares thread contracts and validates message shapes", () => {
+    expect(JSON.stringify(${name}Agent)).toContain("startThread");
+    expect(JSON.stringify(${name}Agent)).toContain("continueThread");
+    expect(JSON.stringify(${name}Agent)).toContain("listThreadMessages");
+    expect(
+      Schema.decodeUnknownSync(${startArgsName})({
+        workspaceId: "workspace_123",
+        userId: "user_123",
+        firstMessage: "Start the web-facing agent seat.",
+      }),
+    ).toMatchObject({ workspaceId: "workspace_123" });
+    expect(
+      Schema.decodeUnknownSync(${continueArgsName})({
+        workspaceId: "workspace_123",
+        userId: "user_123",
+        threadId: "thread_123",
+        message: "Continue.",
+        idempotencyKey: "turn-001",
+      }),
+    ).toMatchObject({ threadId: "thread_123" });
+    expect(
+      Schema.decodeUnknownSync(${messageName})({
+        id: "msg_1",
+        role: "assistant",
+        content: "Done.",
+        createdAt: 1,
+      }),
+    ).toMatchObject({ role: "assistant" });
+  });
+
+  it("starts with no provider-backed tools", () => {
+    expect(${toolsName}).toEqual([]);
+    expect(list${pascalName}ToolNames()).toEqual([]);
+  });
+
+  it("exports a finalized Confect implementation", () => {
+    expect(${name}AgentImpl).toMatchObject({
+      _op_layer: "Fold",
+    });
+  });
+});
+`,
+    },
+    {
+      path: `docs/template/generated/agents/${name}.md`,
+      content: `# ${pascalName} Agent Seat
+
+${description}
+
+## Generated Contract
+
+- Agent: \`${name}\`
+- Surfaces: \`["web"]\`
+- Agent seat: web-facing
+- Headless exposure: none. This generator does not create API, CLI, MCP, \`.headless.json\`, or headless registry entries.
+- Tool grants: none by default.
+
+## Files
+
+- \`packages/convex/confect/agents/${name}.spec.ts\`
+- \`packages/convex/confect/agents/${name}.impl.ts\`
+- \`packages/convex/confect/agents/${name}.tools.ts\`
+- \`packages/convex/test/${name}.agent.test.ts\`
+
+## Required Follow-Up
+
+1. Wire the generated web agent seat into the app route or feature module.
+2. Review tool grants before adding model-call or provider-backed behavior.
+3. Run \`pnpm confect:codegen\` before importing generated refs from runtime surfaces.
+4. Keep API, CLI, and MCP exposure out until a separate headless contract review approves it.
+`,
+    },
+  ];
+
+  return {
+    name,
+    pascalName,
+    surfaces: ["web"],
+    headlessExposure: false,
+    files,
+    followUp,
   };
 };
 
@@ -2494,6 +2896,8 @@ export const runGeneratorCli = (
             "template:add-client-domain --name <name> [--description <text>] [--write]",
             "template:add-capability --name <name> [--description <text>] [--exposure web|workflow|headless] [--write]",
             "template:add-workflow --name <name> [--description <text>] [--write]",
+            "template:add-agent --name <name> [--description <text>] [--write]",
+            "template:add-agent-seat --name <name> [--description <text>] [--write]",
             "template:promote-capability --name <name> [--description <text>] [--write]",
             "template:promote-workflow --name <name> [--description <text>] [--write]",
             "template:upgrade --from <client-version> --to <template-version>",
@@ -2704,6 +3108,31 @@ export const runGeneratorCli = (
       }
 
       const result = buildWorkflowFiles({
+        name: args.name,
+        ...(args.description ? { description: args.description } : {}),
+      });
+
+      if (args.write) {
+        writeGeneratedFiles(result.files, cwd);
+      }
+
+      return {
+        exitCode: 0,
+        stdout: `${JSON.stringify(result, null, 2)}\n`,
+        stderr: "",
+      };
+    }
+
+    if (args.command === "add-agent" || args.command === "add-agent-seat") {
+      if (!args.name) {
+        return {
+          exitCode: 1,
+          stdout: "",
+          stderr: `Missing required --name for ${args.command}\n`,
+        };
+      }
+
+      const result = buildAgentFiles({
         name: args.name,
         ...(args.description ? { description: args.description } : {}),
       });

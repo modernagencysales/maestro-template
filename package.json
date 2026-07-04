@@ -34,6 +34,8 @@
     "template:add-client-domain": "tsx tooling/generators/src/index.ts add-client-domain",
     "template:add-capability": "tsx tooling/generators/src/index.ts add-capability",
     "template:add-workflow": "tsx tooling/generators/src/index.ts add-workflow",
+    "template:add-agent": "tsx tooling/generators/src/index.ts add-agent",
+    "template:add-agent-seat": "tsx tooling/generators/src/index.ts add-agent-seat",
     "template:promote-capability": "tsx tooling/generators/src/index.ts promote-capability",
     "template:promote-workflow": "tsx tooling/generators/src/index.ts promote-workflow",
     "template:workflow-output-smoke": "tsx tooling/generators/src/workflow-output-smoke.ts",
