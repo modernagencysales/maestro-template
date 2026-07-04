@@ -288,7 +288,22 @@ const mcpInputSchema: JsonSchema = {
   additionalProperties: true,
 };
 
-export const buildMcpTools = buildGeneratedMcpTools;
+const workflowRunMcpTool: McpToolEntry = {
+  name: "template.workflow.run",
+  description: "Run the template workflow compatibility adapter.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+  },
+  typedErrors: [],
+};
+
+export const buildMcpTools = (
+  registry: TemplateRegistry = templateRegistry,
+): readonly McpToolEntry[] => [
+  ...buildGeneratedMcpTools(registry),
+  workflowRunMcpTool,
+];
 
 export const runTemplateWorkflow = (
   registry: TemplateRegistry = templateRegistry,
@@ -328,7 +343,7 @@ export const callMcpTool = (
   toolName: string,
   registry: TemplateRegistry = templateRegistry,
 ): McpToolCallResult => {
-  if (toolName === "template.workflow.run") {
+  if (toolName === workflowRunMcpTool.name) {
     return mcpText(runTemplateWorkflow(registry));
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildApiCatalog,
+  buildGeneratedMcpTools,
   buildHeadlessOperations,
   buildMcpTools,
   buildOpenApiDocument,
@@ -77,6 +78,18 @@ describe("workflow headless registry", () => {
         "MemberNotInWorkspace",
         "WorkspaceNotFound",
       ],
+    });
+    expect(buildGeneratedMcpTools()).not.toContainEqual(
+      expect.objectContaining({ name: "template.workflow.run" }),
+    );
+    expect(buildMcpTools()).toContainEqual({
+      name: "template.workflow.run",
+      description: "Run the template workflow compatibility adapter.",
+      inputSchema: expect.objectContaining({
+        type: "object",
+        additionalProperties: false,
+      }),
+      typedErrors: [],
     });
     expect(buildMcpTools()).not.toContainEqual(
       expect.objectContaining({ name: "template.resolveSourceSet" }),

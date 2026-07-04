@@ -76,6 +76,15 @@ describe("maestro-template CLI", () => {
         inputSchema: expect.objectContaining({ type: "object" }),
       }),
     );
+    expect(JSON.parse(runCli(["mcp", "tools"]).stdout)).toContainEqual(
+      expect.objectContaining({
+        name: "template.workflow.run",
+        inputSchema: expect.objectContaining({
+          type: "object",
+          additionalProperties: false,
+        }),
+      }),
+    );
     expect(JSON.parse(runCli(["mcp", "tools"]).stdout)).not.toContainEqual(
       expect.objectContaining({ name: "template.resolveSourceSet" }),
     );
