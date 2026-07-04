@@ -82,11 +82,15 @@ export type AccessLifecycleError =
   | MemberNotInWorkspace
   | ValidationFailed;
 
-export type PlannerResult<A> = Either.Either<A, AccessLifecycleError>;
+export type PlannerResult<
+  A,
+  E extends AccessLifecycleError = AccessLifecycleError,
+> = Either.Either<A, E>;
 
-const fail = (error: AccessLifecycleError): PlannerResult<never> =>
-  Either.left(error);
-const succeed = <A>(value: A): PlannerResult<A> => Either.right(value);
+const fail = <E extends AccessLifecycleError>(
+  error: E,
+): PlannerResult<never, E> => Either.left(error);
+const succeed = <A>(value: A): PlannerResult<A, never> => Either.right(value);
 
 export const changeMemberRole = (input: {
   readonly actorUserId: string;
@@ -96,10 +100,13 @@ export const changeMemberRole = (input: {
   readonly liveWorkspaceMembers: readonly WorkspaceMemberLifecycleRef[];
   readonly newRole: Role;
   readonly now: number;
-}): PlannerResult<{
-  readonly patch: Patch<{ readonly role: Role; readonly updatedAt: number }>;
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly patch: Patch<{ readonly role: Role; readonly updatedAt: number }>;
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  Forbidden | LastOwnerProtected | MemberNotInWorkspace
+> => {
   const liveTarget = requireLiveWorkspaceMember(
     input.target,
     input.workspaceId,
@@ -148,15 +155,18 @@ export const removeMember = (input: {
   readonly target: WorkspaceMemberLifecycleRef;
   readonly liveWorkspaceMembers: readonly WorkspaceMemberLifecycleRef[];
   readonly now: number;
-}): PlannerResult<{
-  readonly patch: Patch<{
-    readonly status: "revoked";
-    readonly revokedAt: number;
-    readonly deletedAt: number;
-    readonly updatedAt: number;
-  }>;
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly patch: Patch<{
+      readonly status: "revoked";
+      readonly revokedAt: number;
+      readonly deletedAt: number;
+      readonly updatedAt: number;
+    }>;
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  Forbidden | LastOwnerProtected | MemberNotInWorkspace
+> => {
   const liveTarget = requireLiveWorkspaceMember(
     input.target,
     input.workspaceId,
@@ -204,13 +214,16 @@ export const transferOwnership = (input: {
   readonly target: WorkspaceMemberLifecycleRef;
   readonly actorMembership: WorkspaceMemberLifecycleRef;
   readonly now: number;
-}): PlannerResult<{
-  readonly patches: readonly Patch<{
-    readonly role: Role;
-    readonly updatedAt: number;
-  }>[];
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly patches: readonly Patch<{
+      readonly role: Role;
+      readonly updatedAt: number;
+    }>[];
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  Forbidden | MemberNotInWorkspace
+> => {
   const liveTarget = requireLiveWorkspaceMember(
     input.target,
     input.workspaceId,
@@ -263,10 +276,13 @@ export const buildWorkspaceInvitation = (input: {
   readonly invitedByUserId: string;
   readonly tokenHash: string;
   readonly now: number;
-}): PlannerResult<{
-  readonly invitation: Omit<InvitationRef, "id">;
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly invitation: Omit<InvitationRef, "id">;
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  ValidationFailed
+> => {
   const email = requireNormalizedEmail(input.inviteeEmail, "email");
   if (Either.isLeft(email)) return fail(email.left);
   const invitation = {
@@ -305,15 +321,18 @@ export const acceptInvitation = (input: {
   readonly userId: string;
   readonly existingLiveMembership: WorkspaceMemberLifecycleRef | null;
   readonly now: number;
-}): PlannerResult<{
-  readonly invitationPatch: Patch<{
-    readonly status: "accepted";
-    readonly acceptedAt: number;
-    readonly updatedAt: number;
-  }>;
-  readonly membershipInsert: Omit<WorkspaceMemberLifecycleRef, "id"> | null;
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly invitationPatch: Patch<{
+      readonly status: "accepted";
+      readonly acceptedAt: number;
+      readonly updatedAt: number;
+    }>;
+    readonly membershipInsert: Omit<WorkspaceMemberLifecycleRef, "id"> | null;
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  InvitationExpired | InvitationNotAccessible | InvitationNotPending
+> => {
   const invitation = requireAccessibleInvitation(
     input.invitation,
     input.verifiedEmail,
@@ -363,14 +382,17 @@ export const declineInvitation = (input: {
   readonly invitation: InvitationRef | null;
   readonly verifiedEmail: string | null | undefined;
   readonly now: number;
-}): PlannerResult<{
-  readonly invitationPatch: Patch<{
-    readonly status: "declined";
-    readonly revokedAt: number;
-    readonly updatedAt: number;
-  }> | null;
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly invitationPatch: Patch<{
+      readonly status: "declined";
+      readonly revokedAt: number;
+      readonly updatedAt: number;
+    }> | null;
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  InvitationNotAccessible
+> => {
   const invitation = requireAccessibleInvitation(
     input.invitation,
     input.verifiedEmail,
@@ -406,14 +428,17 @@ export const cancelInvitation = (input: {
   readonly workspaceId: string;
   readonly actorUserId: string;
   readonly now: number;
-}): PlannerResult<{
-  readonly invitationPatch: Patch<{
-    readonly status: "cancelled";
-    readonly revokedAt: number;
-    readonly updatedAt: number;
-  }> | null;
-  readonly events: readonly AccessLifecycleEvent[];
-}> => {
+}): PlannerResult<
+  {
+    readonly invitationPatch: Patch<{
+      readonly status: "cancelled";
+      readonly revokedAt: number;
+      readonly updatedAt: number;
+    }> | null;
+    readonly events: readonly AccessLifecycleEvent[];
+  },
+  never
+> => {
   if (
     input.invitation === null ||
     input.invitation.workspaceId !== input.workspaceId ||
@@ -446,7 +471,7 @@ export const cancelInvitation = (input: {
 const requireLiveWorkspaceMember = (
   member: WorkspaceMemberLifecycleRef,
   workspaceId: string,
-): PlannerResult<WorkspaceMemberLifecycleRef> => {
+): PlannerResult<WorkspaceMemberLifecycleRef, MemberNotInWorkspace> => {
   if (
     member.workspaceId !== workspaceId ||
     member.status !== "active" ||
@@ -462,7 +487,7 @@ const requireLiveWorkspaceMember = (
 const requireActorCanManage = (
   actorRole: Role,
   targetRole: Role,
-): PlannerResult<void> => {
+): PlannerResult<void, Forbidden> => {
   if (!roleAtLeast(actorRole, targetRole)) {
     return fail(
       new Forbidden({
@@ -476,7 +501,7 @@ const requireActorCanManage = (
 const requireActorCanGrant = (
   actorRole: Role,
   newRole: Role,
-): PlannerResult<void> => {
+): PlannerResult<void, Forbidden> => {
   if (!roleAtLeast(actorRole, newRole)) {
     return fail(
       new Forbidden({
@@ -490,7 +515,7 @@ const requireActorCanGrant = (
 const requireNotLastOwner = (
   workspaceId: string,
   members: readonly WorkspaceMemberLifecycleRef[],
-): PlannerResult<void> => {
+): PlannerResult<void, LastOwnerProtected> => {
   const liveOwners = members.filter(
     (member) =>
       member.workspaceId === workspaceId &&
@@ -509,7 +534,7 @@ const requireNotLastOwner = (
 const requireNormalizedEmail = (
   value: string,
   field: string,
-): PlannerResult<string> => {
+): PlannerResult<string, ValidationFailed> => {
   const normalized = normalizeEmail(value);
   if (normalized.kind !== "verified") {
     return fail(
@@ -532,7 +557,7 @@ const normalizeAccessibleEmail = (
 const requireAccessibleInvitation = (
   invitation: InvitationRef | null,
   verifiedEmail: string | null | undefined,
-): PlannerResult<InvitationRef> => {
+): PlannerResult<InvitationRef, InvitationNotAccessible> => {
   const email = normalizeAccessibleEmail(verifiedEmail);
   if (invitation === null || email === null) {
     return fail(new InvitationNotAccessible());
@@ -546,7 +571,7 @@ const requireAccessibleInvitation = (
 
 const requireInvitationPending = (
   invitation: InvitationRef,
-): PlannerResult<void> => {
+): PlannerResult<void, InvitationNotPending> => {
   if (invitation.status !== "pending") {
     return fail(new InvitationNotPending({ invitationId: invitation.id }));
   }

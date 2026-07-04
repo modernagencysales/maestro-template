@@ -7,8 +7,6 @@ import {
   InvitationExpired,
   InvitationNotAccessible,
   InvitationNotPending,
-  LastOwnerProtected,
-  MemberNotInWorkspace,
   Unauthorized,
   ValidationFailed,
   WorkspaceNotFound,
@@ -25,17 +23,7 @@ const create = FunctionSpec.publicMutation({
     }),
   returns: () => Id("invitations"),
   error: () =>
-    Schema.Union(
-      Unauthorized,
-      Forbidden,
-      InvitationExpired,
-      InvitationNotAccessible,
-      InvitationNotPending,
-      LastOwnerProtected,
-      MemberNotInWorkspace,
-      ValidationFailed,
-      WorkspaceNotFound,
-    ),
+    Schema.Union(Unauthorized, Forbidden, ValidationFailed, WorkspaceNotFound),
 });
 
 const accept = FunctionSpec.publicMutation({
@@ -54,10 +42,6 @@ const accept = FunctionSpec.publicMutation({
       InvitationNotAccessible,
       InvitationNotPending,
       InvitationExpired,
-      Forbidden,
-      LastOwnerProtected,
-      MemberNotInWorkspace,
-      ValidationFailed,
     ),
 });
 
@@ -68,17 +52,7 @@ const decline = FunctionSpec.publicMutation({
       invitationId: Id("invitations"),
     }),
   returns: () => Schema.Null,
-  error: () =>
-    Schema.Union(
-      Unauthorized,
-      Forbidden,
-      InvitationExpired,
-      InvitationNotAccessible,
-      InvitationNotPending,
-      LastOwnerProtected,
-      MemberNotInWorkspace,
-      ValidationFailed,
-    ),
+  error: () => Schema.Union(Unauthorized, InvitationNotAccessible),
 });
 
 const cancel = FunctionSpec.publicMutation({
@@ -89,17 +63,7 @@ const cancel = FunctionSpec.publicMutation({
       workspaceId: Id("workspaces"),
     }),
   returns: () => Schema.Null,
-  error: () =>
-    Schema.Union(
-      Unauthorized,
-      Forbidden,
-      InvitationExpired,
-      InvitationNotAccessible,
-      InvitationNotPending,
-      LastOwnerProtected,
-      MemberNotInWorkspace,
-      ValidationFailed,
-    ),
+  error: () => Schema.Union(Unauthorized, Forbidden),
 });
 
 export default GroupSpec.make()
