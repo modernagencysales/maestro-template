@@ -14,7 +14,7 @@ For backend or headless behavior, emit or update:
   private-package posture.
 - Confect spec/impl.
 - Effect schema.
-- typed errors.
+- shared typed errors imported from the owning Confect errors module.
 - behavior tests.
 - reviewer-safe fixtures.
 - README or generated docs.
@@ -46,6 +46,18 @@ For user-facing behavior, also emit or update:
 
 - Runtime-authored capabilities and workflows are data until promoted.
 - Promotion to generated Confect source is the compile-time safety path.
+- Capability generators emit flat Confect files:
+  `packages/convex/confect/capabilities/<name>.spec.ts`,
+  `packages/convex/confect/capabilities/<name>.impl.ts`,
+  `packages/convex/confect/capabilities/<name>.domain.ts`,
+  `packages/convex/confect/capabilities/<name>.test.ts`, and
+  `packages/convex/confect/capabilities/<name>.headless.json`.
+- Generated capability docs are emitted at
+  `docs/template/generated/capabilities/<name>.md`.
+- Flat generated capability specs import shared errors with
+  `import { Forbidden, Unauthorized, ValidationFailed } from "../errors";` and
+  declare
+  `error: () => Schema.Union(Unauthorized, ValidationFailed, Forbidden)`.
 - Generated source must never import from `repos/*`.
 - Generated client-specific logic stays under generated modules or
   `private-packages/<name>/` until reviewed.

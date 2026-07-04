@@ -586,18 +586,25 @@ describe("template app factory generators", () => {
       exposure: "headless",
     });
     expect(generated.files.map((file) => file.path)).toEqual([
-      "generated/capabilities/summarizeSource/summarizeSource.spec.ts",
-      "generated/capabilities/summarizeSource/summarizeSource.impl.ts",
-      "generated/capabilities/summarizeSource/summarizeSource.domain.ts",
-      "generated/capabilities/summarizeSource/summarizeSource.test.ts",
-      "generated/capabilities/summarizeSource/summarizeSource.headless.json",
-      "generated/capabilities/summarizeSource/README.md",
+      "packages/convex/confect/capabilities/summarizeSource.spec.ts",
+      "packages/convex/confect/capabilities/summarizeSource.impl.ts",
+      "packages/convex/confect/capabilities/summarizeSource.domain.ts",
+      "packages/convex/confect/capabilities/summarizeSource.test.ts",
+      "packages/convex/confect/capabilities/summarizeSource.headless.json",
+      "docs/template/generated/capabilities/summarizeSource.md",
     ]);
     expect(generated.files[0]?.content).toContain(
       "FunctionSpec.publicMutation",
     );
+    expect(generated.files[0]?.content).toContain(
+      'import { Forbidden, Unauthorized, ValidationFailed } from "../errors"',
+    );
     expect(generated.files[0]?.content).toContain("error: () =>");
+    expect(generated.files[0]?.content).toContain(
+      "Schema.Union(Unauthorized, ValidationFailed, Forbidden)",
+    );
     expect(generated.files[0]?.content).not.toContain("errors: () =>");
+    expect(generated.files[0]?.content).not.toContain("Schema.TaggedStruct");
     expect(generated.files[2]?.content).toContain(
       "normalizeSummarizeSourceInput",
     );
@@ -634,11 +641,11 @@ describe("template app factory generators", () => {
       );
       const specPath = join(
         cwd,
-        "generated/capabilities/summarizeSource/summarizeSource.spec.ts",
+        "packages/convex/confect/capabilities/summarizeSource.spec.ts",
       );
       const metadataPath = join(
         cwd,
-        "generated/capabilities/summarizeSource/summarizeSource.headless.json",
+        "packages/convex/confect/capabilities/summarizeSource.headless.json",
       );
 
       expect(result.exitCode).toBe(0);
@@ -734,14 +741,17 @@ describe("template app factory generators", () => {
       target: "capability",
     });
     expect(promoted.files.map((file) => file.path)).toEqual([
-      "packages/convex/confect/capabilities/summarizeSource/summarizeSource.spec.ts",
-      "packages/convex/confect/capabilities/summarizeSource/summarizeSource.impl.ts",
-      "packages/convex/confect/capabilities/summarizeSource/summarizeSource.headless.json",
-      "packages/convex/confect/capabilities/summarizeSource/README.md",
+      "packages/convex/confect/capabilities/summarizeSource.spec.ts",
+      "packages/convex/confect/capabilities/summarizeSource.impl.ts",
+      "packages/convex/confect/capabilities/summarizeSource.headless.json",
+      "docs/template/generated/capabilities/summarizeSource.md",
     ]);
     expect(promoted.files[0]?.content).toContain("FunctionSpec.publicMutation");
+    expect(promoted.files[0]?.content).toContain(
+      'import { Forbidden, Unauthorized, ValidationFailed } from "../errors"',
+    );
     expect(promoted.files[1]?.content).toContain(
-      'import databaseSchema from "../../_generated/schema"',
+      'import databaseSchema from "../_generated/schema"',
     );
     expect(JSON.parse(promoted.files[2]?.content ?? "{}")).toMatchObject({
       migrationNotes: expect.arrayContaining([
@@ -771,7 +781,7 @@ describe("template app factory generators", () => {
       );
       const specPath = join(
         cwd,
-        "packages/convex/confect/capabilities/summarizeSource/summarizeSource.spec.ts",
+        "packages/convex/confect/capabilities/summarizeSource.spec.ts",
       );
 
       expect(result.exitCode).toBe(0);

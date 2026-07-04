@@ -1022,13 +1022,14 @@ export const buildCapabilityFiles = (
   const description =
     options.description ??
     `Generated ${name} capability. Replace the domain logic while preserving the contract shape.`;
-  const basePath = `generated/capabilities/${name}`;
+  const basePath = `packages/convex/confect/capabilities/${name}`;
   const typedErrors = ["Unauthorized", "ValidationFailed", "Forbidden"];
   const files: readonly GeneratedFile[] = [
     {
-      path: `${basePath}/${name}.spec.ts`,
+      path: `${basePath}.spec.ts`,
       content: `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
+import { Forbidden, Unauthorized, ValidationFailed } from "../errors";
 
 export const ${name}Args = Schema.Struct({
   workspaceSlug: Schema.String,
@@ -1040,34 +1041,22 @@ export const ${name}Returns = Schema.Struct({
   summary: Schema.String,
 });
 
-export const ${name}Errors = Schema.Union(
-  Schema.TaggedStruct("Unauthorized", {
-    message: Schema.String,
-  }),
-  Schema.TaggedStruct("ValidationFailed", {
-    message: Schema.String,
-  }),
-  Schema.TaggedStruct("Forbidden", {
-    message: Schema.String,
-  }),
-);
-
 export const ${name} = FunctionSpec.publicMutation({
   name: "${name}",
   args: () => ${name}Args,
   returns: () => ${name}Returns,
-  error: () => ${name}Errors,
+  error: () => Schema.Union(Unauthorized, ValidationFailed, Forbidden),
 });
 
 export default GroupSpec.make().addFunction(${name});
 `,
     },
     {
-      path: `${basePath}/${name}.impl.ts`,
+      path: `${basePath}.impl.ts`,
       content: `import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../../confect/_generated/schema";
+import databaseSchema from "../_generated/schema";
 import ${name}Group, { ${name} } from "./${name}.spec";
 
 const ${name}Impl = FunctionImpl.make(databaseSchema, ${name}Group, "${name}", () =>
@@ -1084,7 +1073,7 @@ export default GroupImpl.make(databaseSchema, ${name}Group).pipe(
 `,
     },
     {
-      path: `${basePath}/${name}.domain.ts`,
+      path: `${basePath}.domain.ts`,
       content: `// Pure domain seam for ${name}. Replace the placeholder fields with the
 // real capability input, keep normalize/validate pure, and keep provider
 // calls out of this file (they belong in the impl behind services).
@@ -1118,7 +1107,7 @@ export const validate${pascalName}Input = (
 `,
     },
     {
-      path: `${basePath}/${name}.test.ts`,
+      path: `${basePath}.test.ts`,
       content: `import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -1165,7 +1154,7 @@ describe("${name} generated capability domain", () => {
 `,
     },
     {
-      path: `${basePath}/${name}.headless.json`,
+      path: `${basePath}.headless.json`,
       content: `${JSON.stringify(
         {
           capability: name,
@@ -1193,7 +1182,7 @@ describe("${name} generated capability domain", () => {
 `,
     },
     {
-      path: `${basePath}/README.md`,
+      path: `docs/template/generated/capabilities/${name}.md`,
       content: `# ${pascalName} Capability
 
 ${description}
@@ -1207,7 +1196,7 @@ ${description}
 
 ## Required Follow-Up
 
-1. Move generated files into the owning Confect group.
+1. Review the flat files in \`packages/convex/confect/capabilities/\`.
 2. Run \`pnpm confect:codegen\`.
 3. Add generated refs to the web/API/CLI/MCP surfaces selected in \`${name}.headless.json\`.
 4. Replace the placeholder implementation with domain logic behind capability checks.
@@ -1358,10 +1347,10 @@ export const buildCapabilityPromotionFiles = (
   const basePath = `packages/convex/confect/capabilities/${name}`;
   const files: readonly GeneratedFile[] = [
     {
-      path: `${basePath}/${name}.spec.ts`,
+      path: `${basePath}.spec.ts`,
       content: `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-import { Forbidden, Unauthorized, ValidationFailed } from "../../errors";
+import { Forbidden, Unauthorized, ValidationFailed } from "../errors";
 
 export const ${name}Args = Schema.Struct({
   workspaceSlug: Schema.String,
@@ -1385,11 +1374,11 @@ export default GroupSpec.make().addFunction(${name});
 `,
     },
     {
-      path: `${basePath}/${name}.impl.ts`,
+      path: `${basePath}.impl.ts`,
       content: `import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../../_generated/schema";
+import databaseSchema from "../_generated/schema";
 import ${name}Group, { ${name} } from "./${name}.spec";
 
 const ${name}Impl = FunctionImpl.make(
@@ -1410,7 +1399,7 @@ export default GroupImpl.make(databaseSchema, ${name}Group).pipe(
 `,
     },
     {
-      path: `${basePath}/${name}.headless.json`,
+      path: `${basePath}.headless.json`,
       content: `${JSON.stringify(
         {
           capability: name,
@@ -1430,7 +1419,7 @@ export default GroupImpl.make(databaseSchema, ${name}Group).pipe(
       )}\n`,
     },
     {
-      path: `${basePath}/README.md`,
+      path: `docs/template/generated/capabilities/${name}.md`,
       content: `# ${pascalName} Promoted Capability
 
 ${description}
