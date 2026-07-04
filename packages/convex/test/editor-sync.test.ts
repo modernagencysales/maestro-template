@@ -255,7 +255,9 @@ describe("editor sync registration", () => {
   });
 
   it("records Brain page snapshots through the internal mirror mutation", async () => {
-    const runMutation = vi.fn(async () => null);
+    const runMutation = vi.fn<(_ref: unknown, _args: unknown) => Promise<null>>(
+      async () => null,
+    );
     const ctx = {
       db: {
         normalizeId: vi.fn(() => "page_1"),
