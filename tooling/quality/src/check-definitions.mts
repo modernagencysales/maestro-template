@@ -565,6 +565,18 @@ export const checkDescriptors = {
         includes: ["API/CLI/MCP -> headless registry"],
         message: "architecture docs must include headless projection",
       },
+      {
+        file: "tooling/quality/check-headless-surface-contract.mts",
+        includes: [
+          "missingTypedErrors",
+          "cannedRegistryImport",
+          "cannedRuntimeSuccess",
+          "missingGeneratedRefMapping",
+          "evaluateHeadlessSurfaceContract",
+        ],
+        message:
+          "headless surface gate must run semantic generated parity checks",
+      },
     ],
   },
   "posthog-readiness": {

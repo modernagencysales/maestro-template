@@ -26,6 +26,7 @@ strongest first:
 | Use Confect/Effect contracts                  | current mechanical: `check:convex` codegen drift diff and semantic `check:confect-contracts`; current pin-only/static: `check:confect-compat`; planned by the effectification plan: semantic `@confect/test` contract tests and generated-manifest parity tests                                           |
 | Preserve Confect v9 authoring model           | mechanical subset: `check:confect-v9` verifies v9 package pins, no root aggregate entrypoints, no `effect` barrel imports under `packages/convex/confect`, lazy `FunctionSpec` schema thunks, generated `databaseSchema` impls with finalize, and lazy table default exports without table-name arguments |
 | Do not edit generated files                   | mechanical: `check:convex` (codegen + `git diff --exit-code`); pin-only: `check:generated-files`                                                                                                                                                                                                          |
+| API/CLI/MCP generated surface parity          | mechanical: `check:headless-surface-contract` verifies generated manifest exposure has typed errors, idempotency-key enforcement proof, generated ref mappings, and no canned registry/runtime success shortcuts                                                                                          |
 
 ## Code quality
 

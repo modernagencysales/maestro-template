@@ -23,6 +23,11 @@ export type CliResult = {
 
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
+export const generatedCliOperationRefs = {
+  "brain.pages.createMarkdown":
+    "maestro-template capability run brain.pages.createMarkdown",
+} as const satisfies Record<string, string>;
+
 export const runCli = (argv: readonly string[]): CliResult => {
   const [command, subcommand, maybeId] = argv;
 

@@ -1,11 +1,14 @@
 import {
-  createSampleWorkflowRunReceipt,
-  templateRegistry,
-  validateTemplateRegistry,
   type TemplateRegistry,
   type WorkflowRunReceipt,
 } from "@maestro-template/template-core";
 import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";
+import {
+  describeDefaultWorkflow,
+  describeWorkflowRegistry,
+  runDefaultWorkflow,
+  runWorkflowRegistry,
+} from "./workflow-compat";
 
 type ManifestFunction = (typeof confectManifest.functions)[number];
 type ManifestSurface = ManifestFunction["surfaces"][number];
@@ -15,6 +18,14 @@ const hasSurface = (
   surface: string,
 ): surface is ManifestSurface =>
   (entry.surfaces as readonly string[]).includes(surface);
+
+export const generatedCliOperationRefs: Readonly<Record<string, string>> = {
+  "brain.pages.createMarkdown": "brain.pages.createMarkdown",
+};
+
+export const generatedMcpOperationRefs: Readonly<Record<string, string>> = {
+  "brain.pages.createMarkdown": "template.brain.pages.createMarkdown",
+};
 
 export type HeadlessOperation = {
   readonly id: string;
@@ -114,7 +125,7 @@ export type McpToolCallResult = {
 };
 
 export const buildHeadlessOperations = (
-  _registry: TemplateRegistry = templateRegistry,
+  _registry?: TemplateRegistry,
 ): readonly HeadlessOperation[] =>
   confectManifest.functions.flatMap((entry) =>
     entry.surfaces.map((surface) => ({
@@ -128,30 +139,26 @@ export const buildHeadlessOperations = (
     })),
   );
 
-export const describeWorkflowTemplate = (
-  registry: TemplateRegistry = templateRegistry,
-) => {
-  const validationErrors = validateTemplateRegistry(registry);
-
-  return {
-    valid: validationErrors.length === 0,
-    validationErrors,
-    nodeCount: registry.workflow.nodes.length,
-    edgeCount: registry.workflow.edges.length,
-    capabilityCount: confectManifest.functions.length,
-    agentCount: registry.agents.length,
-    headlessOperationCount: buildHeadlessOperations(registry).length,
-  };
-};
+export const describeWorkflowTemplate = (registry?: TemplateRegistry) =>
+  registry === undefined
+    ? describeDefaultWorkflow(
+        confectManifest.functions.length,
+        buildHeadlessOperations().length,
+      )
+    : describeWorkflowRegistry(
+        registry,
+        confectManifest.functions.length,
+        buildHeadlessOperations(registry).length,
+      );
 
 export const getHeadlessOperation = (
   id: string,
-  registry: TemplateRegistry = templateRegistry,
+  registry?: TemplateRegistry,
 ): HeadlessOperation | undefined =>
   buildHeadlessOperations(registry).find((operation) => operation.id === id);
 
 export const buildApiCatalog = (
-  _registry: TemplateRegistry = templateRegistry,
+  _registry?: TemplateRegistry,
 ): readonly ApiCatalogEntry[] =>
   confectManifest.functions
     .filter((entry) => hasSurface(entry, "api"))
@@ -169,7 +176,7 @@ const objectSchema: JsonSchema = {
 };
 
 export const buildGeneratedOpenApiDocument = (
-  _registry: TemplateRegistry = templateRegistry,
+  _registry?: TemplateRegistry,
 ): OpenApiDocument => {
   return {
     openapi: "3.1.0",
@@ -216,7 +223,7 @@ export const buildOpenApiDocument = buildGeneratedOpenApiDocument;
 export const runTemplateApiOperation = (
   operationId: string,
   request: TemplateApiRequest = {},
-  _registry: TemplateRegistry = templateRegistry,
+  _registry?: TemplateRegistry,
 ): TemplateApiResult => {
   const operation = buildApiCatalog(_registry).find(
     (entry) => entry.operationId === operationId,
@@ -272,12 +279,14 @@ export const runTemplateApiOperation = (
 };
 
 export const buildGeneratedMcpTools = (
-  _registry: TemplateRegistry = templateRegistry,
+  _registry?: TemplateRegistry,
 ): readonly McpToolEntry[] =>
   confectManifest.functions
     .filter((entry) => hasSurface(entry, "mcp"))
     .map((entry) => ({
-      name: `template.${entry.operationId}`,
+      name:
+        generatedMcpOperationRefs[entry.operationId] ??
+        `template.${entry.operationId}`,
       description: `Invoke ${entry.operationId} through the generated Confect contract manifest.`,
       inputSchema: mcpInputSchema,
       typedErrors: entry.typedErrors,
@@ -299,15 +308,16 @@ const workflowRunMcpTool: McpToolEntry = {
 };
 
 export const buildMcpTools = (
-  registry: TemplateRegistry = templateRegistry,
+  registry?: TemplateRegistry,
 ): readonly McpToolEntry[] => [
   ...buildGeneratedMcpTools(registry),
   workflowRunMcpTool,
 ];
 
 export const runTemplateWorkflow = (
-  registry: TemplateRegistry = templateRegistry,
-): WorkflowRunReceipt => createSampleWorkflowRunReceipt(registry);
+  registry?: TemplateRegistry,
+): WorkflowRunReceipt =>
+  registry === undefined ? runDefaultWorkflow() : runWorkflowRegistry(registry);
 
 const mcpText = (value: unknown): McpToolCallResult => ({
   isError: false,
@@ -341,7 +351,7 @@ const mcpError = (message: string): McpToolCallResult => ({
 
 export const callMcpTool = (
   toolName: string,
-  registry: TemplateRegistry = templateRegistry,
+  registry?: TemplateRegistry,
 ): McpToolCallResult => {
   if (toolName === workflowRunMcpTool.name) {
     return mcpText(runTemplateWorkflow(registry));
