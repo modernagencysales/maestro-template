@@ -147,6 +147,15 @@ Brain, workflow, billing, operations, and support surfaces.
 - Feature adapters convert backend contract data into view models.
 - UI code must not read raw environment variables or construct provider SDKs.
 
+## Frontend Data States
+
+Feature components normalize Confect and Convex query/mutation results through
+`apps/web/src/adapters/confect-state.ts`. The canonical statuses are `skipped`,
+`loading`, `empty`, `ready`, `typed_failure`, `parse_failure`,
+`transport_failure`, and `defect`. Components should render these states
+directly or through feature presenters; they should not branch on raw Confect,
+Convex, TanStack Query, or Effect internals.
+
 ## Navigation Model
 
 The template workspace registry should include generic routes:

@@ -73,6 +73,49 @@ export type TemplateMutationState<T, E = never> =
   | TemplateTransportFailureState
   | TemplateDefectState;
 
+export type TemplateDataStatus = TemplateDataState<unknown, unknown>["status"];
+export type TemplateMutationStatus = TemplateMutationState<
+  unknown,
+  unknown
+>["status"];
+
+export const TEMPLATE_DATA_STATUSES = [
+  "skipped",
+  "loading",
+  "empty",
+  "ready",
+  "typed_failure",
+  "parse_failure",
+  "transport_failure",
+  "defect",
+] as const satisfies readonly TemplateDataStatus[];
+
+export const TEMPLATE_MUTATION_STATUSES = [
+  "loading",
+  "ready",
+  "typed_failure",
+  "parse_failure",
+  "transport_failure",
+  "defect",
+] as const satisfies readonly TemplateMutationStatus[];
+
+export type TemplateFailureState<E = unknown> =
+  | TemplateTypedFailureState<E>
+  | TemplateParseFailureState
+  | TemplateTransportFailureState
+  | TemplateDefectState;
+
+export function isTemplateFailureState<E>(
+  state: TemplateDataState<unknown, E> | TemplateMutationState<unknown, E>,
+): state is TemplateFailureState<E> {
+  return (
+    state.status === "typed_failure" ||
+    state.status === "parse_failure" ||
+    state.status === "transport_failure" ||
+    state.status === "defect"
+  );
+}
+
 export type NormalizeOptions<T> = {
   readonly mode?: TemplateReadyMode;
   readonly isEmpty?: (value: T) => boolean;
