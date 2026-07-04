@@ -113,10 +113,10 @@ export const missingCliGeneratedRefUsage = (
   source: string,
 ): string[] => {
   const mappedOperationVariable = source.match(
-    /\b(?:const|let)\s+([a-zA-Z_$][\w$]*)\s*=\s*generatedCliOperationRefs\s*\[[^\]]+\]/,
+    /\b(?:const|let)\s+([a-zA-Z_$][\w$]*)\s*=\s*staticCliOperationRefs\s*\[[^\]]+\]/,
   )?.[1];
   const usesGeneratedCliRefs =
-    /\brunTemplateApiOperation\s*\(\s*generatedCliOperationRefs\s*\[[^\]]+\]/.test(
+    /\brunTemplateApiOperation\s*\(\s*staticCliOperationRefs\s*\[[^\]]+\]/.test(
       source,
     ) ||
     (mappedOperationVariable !== undefined &&
@@ -127,7 +127,7 @@ export const missingCliGeneratedRefUsage = (
   return operationIds.filter(
     (operationId) =>
       !objectMappingPattern(
-        "generatedCliOperationRefs",
+        "staticCliOperationRefs",
         operationId,
         `["'\`]${operationId.replaceAll(".", "\\.")}["'\`]`,
       ).test(source) || !usesGeneratedCliRefs,

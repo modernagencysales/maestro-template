@@ -5,17 +5,6 @@ import {
 import { buildOpenApiDocument } from "@maestro-template/workflow-tooling";
 import type { DurableWorkflowGraphForCanvas } from "@maestro-template/workflow-ui";
 
-export const navItems = [
-  { id: "overview", label: "Overview", icon: "O", active: true },
-  { id: "brain", label: "Brain", icon: "B" },
-  { id: "workflows", label: "Workflows", icon: "W" },
-  { id: "capabilities", label: "Capabilities", icon: "C" },
-  { id: "agents", label: "Agents", icon: "A" },
-  { id: "headless", label: "API / CLI / MCP", icon: "/" },
-  { id: "integrations", label: "Integrations", icon: "I" },
-  { id: "safety", label: "Safety", icon: "S" },
-] as const;
-
 export const stats = templateRegistry.stats;
 export const workflowNodes = templateRegistry.workflow.nodes;
 export const workflowEdges = templateRegistry.workflow.edges;

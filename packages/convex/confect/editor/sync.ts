@@ -15,6 +15,10 @@ export type EditorRole = "viewer" | "editor";
 type EditorAuthCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>;
 
 const editorSyncAccessTimeMs = 0;
+const editorAccessDeniedMessageByRole = {
+  viewer: "Editor sync requires workspace membership.",
+  editor: "Editor sync requires editor access.",
+} satisfies Record<EditorRole, string>;
 
 export const resolveEditorWorkspaceId = async (
   ctx: EditorAuthCtx,
@@ -179,11 +183,7 @@ const requireResolvedEditorAccess = (
   }
 
   if (!roleAtLeast(resolution.role, role)) {
-    throw new Error(
-      role === "editor"
-        ? "Editor sync requires editor access."
-        : "Editor sync requires workspace membership.",
-    );
+    throw new Error(editorAccessDeniedMessageByRole[role]);
   }
 };
 

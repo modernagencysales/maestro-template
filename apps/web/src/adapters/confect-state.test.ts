@@ -8,12 +8,12 @@ import {
   normalizeMutationError,
   normalizeMutationPending,
   normalizeMutationSuccess,
-  normalizeReactQueryResult,
   TEMPLATE_DATA_STATUSES,
   TEMPLATE_MUTATION_STATUSES,
   type TemplateDataState,
   type TemplateMutationState,
 } from "./confect-state";
+import { normalizeReactQueryResult } from "./react-query-state";
 
 type TypedError = {
   readonly _tag: "ValidationFailed";

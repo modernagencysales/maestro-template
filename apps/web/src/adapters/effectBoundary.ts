@@ -39,6 +39,37 @@ const defectState = <TypedError>(
   message: error instanceof Error ? error.message : String(error),
 });
 
+type EffectCompletion<Value, TypedError> =
+  | {
+      readonly status: "completed";
+      readonly result: Either.Either<Value, TypedError>;
+    }
+  | {
+      readonly status: "defected";
+      readonly error: unknown;
+    };
+
+const captureEffectCompletion = async <Value, TypedError>(
+  effect: Effect.Effect<Value, TypedError, never>,
+  signal: AbortSignal | undefined,
+): Promise<EffectCompletion<Value, TypedError>> => {
+  try {
+    const result = await Effect.runPromise(Effect.either(effect), { signal });
+
+    return { status: "completed", result };
+  } catch (error) {
+    return { status: "defected", error };
+  }
+};
+
+const normalizeEffectCompletion = <Value, TypedError>(
+  completion: EffectCompletion<Value, TypedError>,
+  mode: TemplateReadyMode | undefined,
+): FrontendEffectBoundaryResult<Value, TypedError> =>
+  completion.status === "completed"
+    ? normalizeEffectResult(completion.result, mode)
+    : defectState(completion.error);
+
 export const runFrontendEffectBoundary = async <Value, TypedError>(
   effect: Effect.Effect<Value, TypedError, never>,
   options: {
@@ -52,16 +83,10 @@ export const runFrontendEffectBoundary = async <Value, TypedError>(
   );
 
   if (boundaryState === undefined) {
-    try {
-      const result = await Effect.runPromise(Effect.either(effect), {
-        signal: options.signal,
-      });
-      boundaryState =
-        abortStateFor(options.signal) ??
-        normalizeEffectResult(result, options.mode);
-    } catch (error) {
-      boundaryState = abortStateFor(options.signal) ?? defectState(error);
-    }
+    const completion = await captureEffectCompletion(effect, options.signal);
+    boundaryState =
+      abortStateFor(options.signal) ??
+      normalizeEffectCompletion(completion, options.mode);
   }
 
   return boundaryState;

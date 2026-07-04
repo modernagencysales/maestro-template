@@ -28,7 +28,7 @@ export const exposeSurfaces = (
   ...Object.fromEntries(surfaces.map((surface) => [surface, true])),
 });
 
-export const assertSurfaceAllowed = (
+export const isSurfaceAllowed = (
   policy: SurfacePolicy,
   surface: SurfaceType,
 ): boolean => policy[surface] === true;

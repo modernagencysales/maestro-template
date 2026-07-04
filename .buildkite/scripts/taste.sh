@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Hosted agents are bare: install pinned node/pnpm and run frozen install.
-source "$(dirname "$0")/setup.sh"
+source "$SCRIPT_DIR/setup.sh"
 # taste — required AI gate. Runs the LLM taste judge over the PR diff and
 # fails closed: no provider key, no verdict marker, or a blocking verdict all
 # exit non-zero. `--mode fake` is the deterministic no-network wiring check.
-cd "$(dirname "$0")/../.."
+cd "${TEMPLATE_PR_WORKTREE:-$SCRIPT_DIR/../..}"
 
 if [[ "$*" == *"--mode fake"* ]]; then
   pnpm taste -- --mode fake | pnpm exec tsx tooling/quality/extract-ai-verdict.mts

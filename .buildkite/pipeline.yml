@@ -46,7 +46,14 @@ steps:
   - label: ":pipeline: phase-1 deterministic gates"
     key: "phase-1"
     depends_on: "ci-self-protection"
-    command: ".buildkite/scripts/phase1.sh"
+    command: |
+      set -euo pipefail
+      DEFAULT_BRANCH="${BUILDKITE_PIPELINE_DEFAULT_BRANCH:-main}"
+      TRUSTED_DIR="$(mktemp -d)"
+      trap 'rm -rf "$TRUSTED_DIR"' EXIT
+      git fetch --no-tags --depth=1 origin "$DEFAULT_BRANCH"
+      git archive --format=tar FETCH_HEAD .buildkite/scripts | tar -x -C "$TRUSTED_DIR"
+      TEMPLATE_PR_WORKTREE="$PWD" bash "$TRUSTED_DIR/.buildkite/scripts/phase1.sh"
     secrets:
       - GITHUB_TOKEN
     agents:
@@ -55,7 +62,14 @@ steps:
   - label: ":brain: taste"
     key: "taste"
     depends_on: "phase-1"
-    command: ".buildkite/scripts/taste.sh"
+    command: |
+      set -euo pipefail
+      DEFAULT_BRANCH="${BUILDKITE_PIPELINE_DEFAULT_BRANCH:-main}"
+      TRUSTED_DIR="$(mktemp -d)"
+      trap 'rm -rf "$TRUSTED_DIR"' EXIT
+      git fetch --no-tags --depth=1 origin "$DEFAULT_BRANCH"
+      git archive --format=tar FETCH_HEAD .buildkite/scripts | tar -x -C "$TRUSTED_DIR"
+      TEMPLATE_PR_WORKTREE="$PWD" bash "$TRUSTED_DIR/.buildkite/scripts/taste.sh"
     timeout_in_minutes: 20
     secrets:
       - GITHUB_TOKEN
@@ -67,7 +81,14 @@ steps:
   - label: ":shield: contract review"
     key: "contract-review"
     depends_on: "phase-1"
-    command: ".buildkite/scripts/contract-review.sh"
+    command: |
+      set -euo pipefail
+      DEFAULT_BRANCH="${BUILDKITE_PIPELINE_DEFAULT_BRANCH:-main}"
+      TRUSTED_DIR="$(mktemp -d)"
+      trap 'rm -rf "$TRUSTED_DIR"' EXIT
+      git fetch --no-tags --depth=1 origin "$DEFAULT_BRANCH"
+      git archive --format=tar FETCH_HEAD .buildkite/scripts | tar -x -C "$TRUSTED_DIR"
+      TEMPLATE_PR_WORKTREE="$PWD" bash "$TRUSTED_DIR/.buildkite/scripts/contract-review.sh"
     timeout_in_minutes: 20
     secrets:
       - GITHUB_TOKEN

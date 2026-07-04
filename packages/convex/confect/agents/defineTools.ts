@@ -1,4 +1,6 @@
-import type * as Schema from "effect/Schema";
+import * as Schema from "effect/Schema";
+import { runFakeSourceGroundedBrief } from "../capabilities/sourceGroundedBrief.fake";
+import { normalizeSourceGroundedBriefInput } from "../capabilities/sourceGroundedBrief.domain";
 import {
   SourceGroundedBriefArgs,
   type SourceGroundedBriefReturn,
@@ -23,19 +25,51 @@ export type ToolPresentation = {
   readonly sourceTitles: readonly string[];
 };
 
-export type ModelTool = {
-  readonly name: "sourceGroundedBrief";
+export type ModelToolExecution = {
+  readonly assistantMessage: string;
+  readonly presentation: ToolPresentation;
+};
+
+export type PreparedModelToolInvocation = {
+  readonly idempotencyKey: string;
+  readonly execute: () => ModelToolExecution;
+};
+
+export type PrepareModelToolResult =
+  | {
+      readonly ok: true;
+      readonly invocation: PreparedModelToolInvocation;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+    };
+
+export type ModelTool<Result = never> = {
+  readonly name: string;
   readonly refId: string;
+  readonly grantId: string;
+  readonly operationType: ToolOperationType;
+  readonly description: string;
+  readonly inputSchema: Schema.Schema.Any;
+  readonly prepare: (value: unknown) => PrepareModelToolResult;
+  readonly present: (result: Result) => ToolPresentation;
+};
+
+type SourceGroundedBriefTool = ModelTool<
+  Schema.Schema.Type<typeof SourceGroundedBriefReturn>
+> & {
+  readonly name: "sourceGroundedBrief";
+  readonly refId: "capabilities.sourceGroundedBrief.run";
   readonly grantId: "capability.run";
   readonly operationType: "mutation";
-  readonly description: string;
   readonly inputSchema: typeof SourceGroundedBriefArgs;
   readonly present: (
     result: Schema.Schema.Type<typeof SourceGroundedBriefReturn>,
   ) => ToolPresentation;
 };
 
-export const sourceGroundedBriefTool: ModelTool = {
+export const sourceGroundedBriefTool: SourceGroundedBriefTool = {
   name: "sourceGroundedBrief",
   refId: "capabilities.sourceGroundedBrief.run",
   grantId: "capability.run",
@@ -43,12 +77,68 @@ export const sourceGroundedBriefTool: ModelTool = {
   description:
     "Create a source-grounded implementation brief from approved sources.",
   inputSchema: SourceGroundedBriefArgs,
-  present: (result) => ({
+  prepare: (value) => {
+    const decoded = decodeSourceGroundedBriefToolInput(value);
+
+    if (!decoded.ok) {
+      return decoded;
+    }
+
+    return {
+      ok: true,
+      invocation: {
+        idempotencyKey: decoded.input.idempotencyKey,
+        execute: () => {
+          const result = runFakeSourceGroundedBrief({
+            input: normalizeSourceGroundedBriefInput(decoded.input),
+            sources: decoded.input.sourceIds.map((sourceId) => ({
+              id: sourceId,
+              title: `Source ${sourceId}`,
+              markdown:
+                "Synthetic source content for fake-mode agent tool run.",
+            })),
+            policySnapshotId: `policy_snapshot_${decoded.input.idempotencyKey}`,
+            modelReceiptId: `model_receipt_${decoded.input.idempotencyKey}`,
+          });
+
+          return {
+            assistantMessage: `I created a source-grounded brief using ${sourceGroundedBriefTool.name}.`,
+            presentation: sourceGroundedBriefTool.present(result),
+          };
+        },
+      },
+    };
+  },
+  present: (result: Schema.Schema.Type<typeof SourceGroundedBriefReturn>) => ({
     title: "Source-grounded brief",
     summary: `Grounded draft backed by ${result.sourceTitles.length} approved source${result.sourceTitles.length === 1 ? "" : "s"}.`,
     trustClaim: result.trustClaim,
     sourceTitles: result.sourceTitles,
   }),
+};
+
+const decodeSourceGroundedBriefToolInput = (
+  value: unknown,
+):
+  | {
+      readonly ok: true;
+      readonly input: Schema.Schema.Type<typeof SourceGroundedBriefArgs>;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+    } => {
+  try {
+    return {
+      ok: true,
+      input: Schema.decodeUnknownSync(SourceGroundedBriefArgs)(value),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Invalid tool input.",
+    };
+  }
 };
 
 export const defineModelTools = (

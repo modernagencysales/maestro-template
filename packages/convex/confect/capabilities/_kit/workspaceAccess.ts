@@ -95,7 +95,7 @@ const loadWorkspace = (workspaceId: GenericId<"workspaces">) =>
       .get(workspaceId)
       .pipe(Effect.orDie);
 
-    return yield* requireWorkspaceRow(workspace, workspaceId);
+    return yield* requireExistingWorkspace(workspace, workspaceId);
   });
 
 const loadWorkspaceOrganization = (
@@ -109,16 +109,26 @@ const loadWorkspaceOrganization = (
       .get(toId<"organizations">(organizationId))
       .pipe(Effect.orDie);
 
-    return yield* requireWorkspaceRow(organization, workspaceId);
+    return yield* requireWorkspaceOrganization(organization, workspaceId);
   });
 
-const requireWorkspaceRow = <Row>(
-  row: Row | null,
+const requireExistingWorkspace = <WorkspaceRow>(
+  workspace: WorkspaceRow | null,
   workspaceId: GenericId<"workspaces">,
 ) =>
-  row === null
+  workspace === null
     ? Effect.fail(new WorkspaceNotFound({ workspaceId }))
-    : Effect.succeed(row);
+    : Effect.succeed(workspace);
+
+const requireWorkspaceOrganization = <OrganizationRow>(
+  organization: OrganizationRow | null,
+  workspaceId: GenericId<"workspaces">,
+) =>
+  // Workspace access exposes a workspace-scoped error surface; a missing owner
+  // organization means this workspace access target cannot be resolved.
+  organization === null
+    ? Effect.fail(new WorkspaceNotFound({ workspaceId }))
+    : Effect.succeed(organization);
 
 const loadWorkspaceAccessMemberships = (input: {
   readonly workspaceId: GenericId<"workspaces">;

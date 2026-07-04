@@ -9,7 +9,7 @@ import { NotFound, ValidationFailed } from "../errors";
 import { withMutationErrorCapture } from "../observability/errorCapture";
 import pages from "./pages.spec";
 
-const withConfectClock = <A, E, R>(
+const unsafeAssumeClockProvided = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
   // Confect provides Clock at runtime, but its current handler type omits it.
@@ -21,7 +21,9 @@ const list = FunctionImpl.make(
   "list",
   ({ workspaceId }) =>
     Effect.gen(function* () {
-      yield* withConfectClock(requireWorkspaceAccess(workspaceId, "viewer"));
+      yield* unsafeAssumeClockProvided(
+        requireWorkspaceAccess(workspaceId, "viewer"),
+      );
       const reader = yield* DatabaseReader;
       return yield* reader
         .table("brainPages")
@@ -39,8 +41,12 @@ const createMarkdown = FunctionImpl.make(
     withMutationErrorCapture(
       "brain/pages.createMarkdown",
       Effect.gen(function* () {
-        yield* withConfectClock(requireWorkspaceAccess(workspaceId, "editor"));
-        const updatedAt = yield* withConfectClock(Clock.currentTimeMillis);
+        yield* unsafeAssumeClockProvided(
+          requireWorkspaceAccess(workspaceId, "editor"),
+        );
+        const updatedAt = yield* unsafeAssumeClockProvided(
+          Clock.currentTimeMillis,
+        );
         const writer = yield* DatabaseWriter;
         return yield* writer
           .table("brainPages")
@@ -85,7 +91,9 @@ const recordSnapshotInternal = FunctionImpl.make(
         );
       }
 
-      const updatedAt = yield* withConfectClock(Clock.currentTimeMillis);
+      const updatedAt = yield* unsafeAssumeClockProvided(
+        Clock.currentTimeMillis,
+      );
       yield* writer
         .table("brainPages")
         .patch(pageId, {

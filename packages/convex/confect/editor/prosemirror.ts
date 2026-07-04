@@ -13,13 +13,10 @@ const isProseMirrorSchema = (
 ): value is ProseMirrorSchema<string, string> =>
   value instanceof ProseMirrorSchema;
 
-const readPmSchema = (editor: BlockNoteEditor): unknown =>
-  Reflect.get(editor, "pmSchema");
-
 export const getBlockNoteSchema = (): ProseMirrorSchema<string, string> => {
   if (cachedSchema !== null) return cachedSchema;
   const editor = BlockNoteEditor.create();
-  const pmSchema = readPmSchema(editor);
+  const pmSchema = editor.pmSchema;
   if (!isProseMirrorSchema(pmSchema)) {
     throw new ConvexError({
       code: "PROSEMIRROR_SCHEMA_DRIFT",

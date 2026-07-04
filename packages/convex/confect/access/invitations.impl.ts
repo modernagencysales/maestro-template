@@ -38,7 +38,7 @@ const create = FunctionImpl.make(
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
-      requireActorRole(actor, "admin");
+      yield* requireActorRole(actor, "admin");
       const workspace = yield* reader
         .table("workspaces")
         .get(workspaceId)
@@ -98,7 +98,7 @@ const accept = FunctionImpl.make(
           now,
         }),
       );
-      const acceptedInvitation = requireLoadedInvitation(invitation);
+      const acceptedInvitation = yield* requireLoadedInvitation(invitation);
 
       yield* writer
         .table("invitations")
@@ -162,7 +162,7 @@ const cancel = FunctionImpl.make(
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
-      requireActorRole(actor, "admin");
+      yield* requireActorRole(actor, "admin");
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
       const plan = yield* fromPlanner(
         cancelInvitation({
@@ -226,7 +226,9 @@ const loadActorForWorkspace = (
       user._id,
     );
     if (membership === null) {
-      return yield* new Forbidden({ reason: "No live workspace membership." });
+      return yield* Effect.fail(
+        new Forbidden({ reason: "No live workspace membership." }),
+      );
     }
     return {
       userId: user._id,
@@ -306,20 +308,17 @@ const toLifecycleMember = (
 const requireActorRole = (
   actor: { readonly role: Role },
   minimumRole: Role,
-): void => {
-  if (!roleAtLeast(actor.role, minimumRole)) {
-    throw new Forbidden({ reason: "Insufficient workspace role." });
-  }
-};
+): Effect.Effect<void, Forbidden> =>
+  roleAtLeast(actor.role, minimumRole)
+    ? Effect.void
+    : Effect.fail(new Forbidden({ reason: "Insufficient workspace role." }));
 
 const requireLoadedInvitation = (
   invitation: InvitationRef | null,
-): InvitationRef => {
-  if (invitation === null) {
-    throw new InvitationNotAccessible();
-  }
-  return invitation;
-};
+): Effect.Effect<InvitationRef, InvitationNotAccessible> =>
+  invitation === null
+    ? Effect.fail(new InvitationNotAccessible())
+    : Effect.succeed(invitation);
 
 const toId = <TableName extends string>(id: string): GenericId<TableName> =>
   id as GenericId<TableName>;

@@ -12,9 +12,9 @@ export type CapabilityKind = "query" | "mutation" | "action";
 
 export type ContractSurface =
   "api" | "cli" | "mcp" | "web" | "workflow" | "internal";
-export type ContractFunctionKind = "query" | "mutation" | "action";
+export type ContractFunctionKind = CapabilityKind;
 
-export type SerializableContractMetadata = {
+export type SerializableContractManifest = {
   readonly namespace: string;
   readonly name: string;
   readonly operationId: string;
@@ -26,7 +26,7 @@ export type SerializableContractMetadata = {
   readonly returnsSchemaName: string;
 };
 
-export type ContractSpecMetadata = SerializableContractMetadata & {
+export type ContractSpecManifest = SerializableContractManifest & {
   readonly argsSchema: Schema.Schema.Any;
   readonly returnsSchema: Schema.Schema.Any;
 };
@@ -37,27 +37,28 @@ export type ContractSchemaRegistry = Readonly<
 
 export type ManifestBoundFunction<Spec> = {
   readonly spec: Spec;
-  readonly manifest: ContractSpecMetadata;
+  readonly manifest: ContractSpecManifest;
 };
 
 export const defineContractFunction = <Spec>(
   spec: Spec,
-  manifest: ContractSpecMetadata,
+  manifest: ContractSpecManifest,
 ): ManifestBoundFunction<Spec> => ({ spec, manifest });
 
 export const collectContractManifest = (
   functions: readonly ManifestBoundFunction<unknown>[],
-): readonly SerializableContractMetadata[] =>
-  functions.map((entry) => {
-    const {
-      argsSchema: _argsSchema,
-      returnsSchema: _returnsSchema,
-      ...serializable
-    } = entry.manifest;
-    void _argsSchema;
-    void _returnsSchema;
-    return serializable;
-  });
+): readonly SerializableContractManifest[] =>
+  functions.map((entry) => ({
+    namespace: entry.manifest.namespace,
+    name: entry.manifest.name,
+    operationId: entry.manifest.operationId,
+    kind: entry.manifest.kind,
+    surfaces: entry.manifest.surfaces,
+    typedErrors: entry.manifest.typedErrors,
+    idempotent: entry.manifest.idempotent,
+    argsSchemaName: entry.manifest.argsSchemaName,
+    returnsSchemaName: entry.manifest.returnsSchemaName,
+  }));
 
 export const collectContractSchemas = (
   functions: readonly ManifestBoundFunction<unknown>[],

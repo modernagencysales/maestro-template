@@ -342,18 +342,28 @@ describe("workspace invitation lifecycle policy", () => {
   });
 
   it("declines and cancels only pending invitations", () => {
-    expect(
-      expectRight(
-        declineInvitation({
-          invitation: invitation({}),
-          verifiedEmail: "ada@example.com",
-          now,
-        }),
-      ).invitationPatch,
-    ).toEqual({
+    const declined = expectRight(
+      declineInvitation({
+        invitation: invitation({}),
+        verifiedEmail: "ada@example.com",
+        now,
+      }),
+    );
+
+    expect(declined.invitationPatch).toEqual({
       id: "invitations_1",
       value: { status: "declined", revokedAt: now, updatedAt: now },
     });
+    expect(declined.events).toEqual([
+      {
+        action: "invitation.declined",
+        workspaceId: "workspaces_1",
+        actorEmail: "ada@example.com",
+        subjectKind: "invitation",
+        subjectId: "invitations_1",
+        metadata: { reason: "declined" },
+      },
+    ]);
 
     expect(
       expectRight(

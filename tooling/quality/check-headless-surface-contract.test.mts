@@ -140,7 +140,7 @@ describe("check:headless-surface-contract", () => {
 
   it("rejects inert CLI mapping constants", () => {
     const unusedMappingSource = `
-      export const generatedCliOperationRefs = {
+      export const staticCliOperationRefs = {
         "brain.pages.createMarkdown": "brain.pages.createMarkdown",
       };
 
@@ -158,11 +158,11 @@ describe("check:headless-surface-contract", () => {
 
   it("accepts CLI mappings only when dispatch resolves through them", () => {
     const source = `
-      export const generatedCliOperationRefs = {
+      export const staticCliOperationRefs = {
         "brain.pages.createMarkdown": "brain.pages.createMarkdown",
       };
 
-      const operationId = generatedCliOperationRefs[maybeId];
+      const operationId = staticCliOperationRefs[maybeId];
       return runTemplateApiOperation(operationId, {});
     `;
 
@@ -173,11 +173,11 @@ describe("check:headless-surface-contract", () => {
 
   it("rejects CLI mappings with regex-compatible but wrong operation IDs", () => {
     const source = `
-      export const generatedCliOperationRefs = {
+      export const staticCliOperationRefs = {
         "brain-pages-createMarkdown": "brain.pages.createMarkdown",
       };
 
-      const operationId = generatedCliOperationRefs[maybeId];
+      const operationId = staticCliOperationRefs[maybeId];
       return runTemplateApiOperation(operationId, {});
     `;
 

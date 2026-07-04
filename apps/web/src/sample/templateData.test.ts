@@ -4,7 +4,6 @@ import {
   brainSources,
   capabilities,
   headlessSurfaces,
-  navItems,
   openApiSummary,
   providerAdapters,
   sampleRunReceipt,
@@ -12,6 +11,7 @@ import {
   workflowEdges,
   workflowNodes,
 } from "./templateData";
+import { navItems } from "./navItems";
 
 describe("template sample data", () => {
   it("keeps navigation ids unique and backed by sample sections", () => {

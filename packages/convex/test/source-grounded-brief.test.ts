@@ -11,8 +11,8 @@ import { WorkspaceWriteErrors } from "../confect/capabilities/_kit/errors";
 import {
   formatContextPackForBrief,
   normalizeSourceGroundedBriefInput,
-  runFakeSourceGroundedBrief,
 } from "../confect/capabilities/sourceGroundedBrief.domain";
+import { runFakeSourceGroundedBrief } from "../confect/capabilities/sourceGroundedBrief.fake";
 import refs from "../confect/_generated/refs";
 import databaseSchema from "../confect/_generated/schema";
 import { MemberNotInWorkspace, ValidationFailed } from "../confect/errors";

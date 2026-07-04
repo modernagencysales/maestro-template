@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Hosted agents are bare: install pinned node/pnpm and run frozen install.
-source "$(dirname "$0")/setup.sh"
+source "$SCRIPT_DIR/setup.sh"
 # contract-review — required AI gate. Judges the whole PR against AGENTS.md and
 # the contract-review rubric, failing closed: no provider key, no verdict
 # marker, or a blocking verdict all exit non-zero. `--mode fake` is the
 # deterministic no-network wiring check.
-cd "$(dirname "$0")/../.."
+cd "${TEMPLATE_PR_WORKTREE:-$SCRIPT_DIR/../..}"
 
 if [[ "$*" == *"--mode fake"* ]]; then
   pnpm contract-review -- --mode fake | pnpm exec tsx tooling/quality/extract-ai-verdict.mts

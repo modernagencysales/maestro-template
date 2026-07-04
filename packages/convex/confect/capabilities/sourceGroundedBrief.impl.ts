@@ -5,14 +5,12 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { requireWorkspaceAccess } from "./_kit/workspaceAccess";
-import {
-  normalizeSourceGroundedBriefInput,
-  runFakeSourceGroundedBrief,
-} from "./sourceGroundedBrief.domain";
+import { runFakeSourceGroundedBrief } from "./sourceGroundedBrief.fake";
+import { normalizeSourceGroundedBriefInput } from "./sourceGroundedBrief.domain";
 import type { SourceGroundedBriefInput } from "./sourceGroundedBrief.domain";
 import sourceGroundedBrief from "./sourceGroundedBrief.spec";
 
-const withConfectClock = <A, E, R>(
+const unsafeAssumeClockProvided = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
   // Confect provides Clock at runtime, but its current handler type omits it.
@@ -20,7 +18,7 @@ const withConfectClock = <A, E, R>(
 
 const runSourceGroundedBrief = (input: SourceGroundedBriefInput) =>
   Effect.gen(function* () {
-    yield* withConfectClock(
+    yield* unsafeAssumeClockProvided(
       requireWorkspaceAccess(
         input.workspaceId as GenericId<"workspaces">,
         "editor",
