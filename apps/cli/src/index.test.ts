@@ -61,7 +61,13 @@ describe("maestro-template CLI", () => {
                 "application/json": {
                   schema: {
                     type: "object",
-                    additionalProperties: true,
+                    additionalProperties: false,
+                    required: ["input", "idempotencyKey"],
+                    properties: {
+                      workspaceSlug: { type: "string" },
+                      idempotencyKey: { type: "string" },
+                      input: expect.objectContaining({ type: "object" }),
+                    },
                   },
                 },
               },
