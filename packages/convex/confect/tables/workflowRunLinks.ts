@@ -23,6 +23,6 @@ export const WorkflowRunLinkRow = Schema.Struct({
 });
 
 export default Table.make(() => WorkflowRunLinkRow)
-  .index("by_workspace_parent", ["workspaceId", "parentWorkflowId"])
-  .index("by_workspace_child", ["workspaceId", "childWorkflowId"])
-  .index("by_workspace_idempotency", ["workspaceId", "idempotencyKey"]);
+  .index("by_workspace_and_parent", ["workspaceId", "parentWorkflowId"])
+  .index("by_workspace_and_child", ["workspaceId", "childWorkflowId"])
+  .index("by_workspace_and_idempotency", ["workspaceId", "idempotencyKey"]);

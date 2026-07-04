@@ -218,9 +218,9 @@ describe("workflow graph model", () => {
       ],
     });
     expect(workflowRunLinks.indexes).toMatchObject({
-      by_workspace_parent: ["workspaceId", "parentWorkflowId"],
-      by_workspace_child: ["workspaceId", "childWorkflowId"],
-      by_workspace_idempotency: ["workspaceId", "idempotencyKey"],
+      by_workspace_and_parent: ["workspaceId", "parentWorkflowId"],
+      by_workspace_and_child: ["workspaceId", "childWorkflowId"],
+      by_workspace_and_idempotency: ["workspaceId", "idempotencyKey"],
     });
     expect(workflowRunEvents.indexes).toMatchObject({
       by_run_sequence: ["workflowRunId", "sequence"],

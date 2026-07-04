@@ -49,7 +49,8 @@ Graph traversal:
 - Join nodes must wait for every required incoming source.
 - Edges with conditions use the safe expression grammar below; false edges do
   not activate their target.
-- Delay nodes call `step.sleep(delayMs)` and return `{ delayedMs }`.
+- Delay nodes call `step.sleep(delayMs, { name })` for stable workflow journal
+  naming and return `{ delayedMs }`.
 - Approval nodes call `step.awaitEvent({ name })`, where name is
   `${graph.id}.${node.id}.approved`, and return the event payload.
 - Capability nodes resolve `node.capability` through the generated capability

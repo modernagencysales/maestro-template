@@ -15,6 +15,8 @@ const classifyRef =
   "internal.capabilities.classify" as unknown as DurableGraphStepRef<"query">;
 const enrichRef =
   "internal.capabilities.enrich" as unknown as DurableGraphStepRef<"action">;
+const agentRef =
+  "internal.capabilities.agent" as unknown as DurableGraphStepRef<"action">;
 const stageStartedRef =
   "internal.workflows.stageStarted" as unknown as DurableGraphStepRef<"mutation">;
 const stageFinishedRef =
@@ -99,8 +101,48 @@ const graph = {
   joins: [],
 } satisfies DurableWorkflowGraph;
 
+const agentGraph = {
+  id: "workflow_agent_spine",
+  version: 1,
+  startNodeId: "source",
+  nodes: [
+    {
+      id: "source",
+      kind: "source",
+      label: "Source",
+      retry: { maxAttempts: 1, backoffMs: 0 },
+    },
+    {
+      id: "agent",
+      kind: "agent",
+      label: "Agent",
+      agent: "draftReply",
+      retry: { maxAttempts: 1, backoffMs: 0 },
+    },
+    {
+      id: "output",
+      kind: "output",
+      label: "Output",
+      retry: { maxAttempts: 1, backoffMs: 0 },
+    },
+  ],
+  edges: [
+    {
+      id: "source_agent",
+      sourceNodeId: "source",
+      targetNodeId: "agent",
+    },
+    {
+      id: "agent_output",
+      sourceNodeId: "agent",
+      targetNodeId: "output",
+    },
+  ],
+  joins: [],
+} satisfies DurableWorkflowGraph;
+
 describe("workflow status projection", () => {
-  it("projects component completion into the public workflow status", () => {
+  it("projects component statuses and defaults unknown blobs safely", () => {
     expect(
       projectWorkflowStatus({
         type: "completed",
@@ -111,6 +153,22 @@ describe("workflow status projection", () => {
       componentStatus: "completed",
       result: { ok: true },
     });
+    expect(
+      projectWorkflowStatus({
+        type: "failed",
+        error: "component exploded",
+      }),
+    ).toEqual({
+      status: "failed",
+      componentStatus: "failed",
+      error: "component exploded",
+    });
+    expect(
+      projectWorkflowStatus({ type: "paused" } as never, {
+        status: "running",
+      }),
+    ).toEqual({ status: "running" });
+    expect(projectWorkflowStatus({} as never)).toEqual({ status: "queued" });
   });
 
   it("lets timeout rows override a still-running component status", () => {
@@ -257,5 +315,64 @@ describe("durable graph runner", () => {
     expect(
       mutationCalls.filter((call) => call.ref === stageFinishedRef),
     ).toHaveLength(graph.nodes.length);
+  });
+
+  it("dispatches agent nodes through registry entries tagged as agent seats", async () => {
+    const actionCalls: unknown[] = [];
+    const step: RunDurableGraphStep = {
+      runQuery: async () => null,
+      runAction: async (ref, args) => {
+        actionCalls.push({ ref, args });
+        return { drafted: true };
+      },
+      runMutation: async () => null,
+      sleep: async () => {},
+      awaitEvent: async <Result>() => ({}) as Result,
+    };
+
+    const result = await runDurableGraphWorkflow(step, {
+      graph: agentGraph,
+      inputs: { prompt: "hello" },
+      policySnapshot: { mode: "review" },
+      capabilityRegistry: {
+        draftReply: {
+          kind: "action",
+          ref: agentRef,
+          agentSeat: true,
+        },
+      },
+      projectOutput: ({ context }) => ({ agent: context.agent }),
+    });
+
+    expect(result).toEqual({ agent: { drafted: true } });
+    expect(actionCalls).toHaveLength(1);
+    expect(actionCalls[0]).toMatchObject({ ref: agentRef });
+  });
+
+  it("rejects agent nodes backed by registry entries without agent seats", async () => {
+    const step: RunDurableGraphStep = {
+      runQuery: async () => null,
+      runAction: async () => ({ drafted: true }),
+      runMutation: async () => null,
+      sleep: async () => {},
+      awaitEvent: async <Result>() => ({}) as Result,
+    };
+
+    await expect(
+      runDurableGraphWorkflow(step, {
+        graph: agentGraph,
+        inputs: { prompt: "hello" },
+        policySnapshot: { mode: "review" },
+        capabilityRegistry: {
+          draftReply: {
+            kind: "action",
+            ref: agentRef,
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: "Agent node is not tagged as an agent seat: draftReply",
+    });
   });
 });
