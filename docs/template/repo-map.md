@@ -63,6 +63,17 @@
 - `packages/observability`: event contracts, logs, SLOs, and telemetry helpers.
 - `packages/search`: optional search/vector provider boundary.
 
+### Editor Packages
+
+- `packages/editor-core`: framework-agnostic editor document ids, codecs, and
+  empty document helpers shared by backend and frontend editor surfaces.
+- `packages/editor-react`: server-safe root helper re-exports at
+  `@maestro-template/editor-react`, plus the browser-only `./client` subpath for
+  future BlockNote React and ProseMirror sync UI.
+- `packages/convex/confect/editor`: future backend editor sync boundary for
+  document access checks, snapshot hooks, and transform-schema derivation from
+  the guarded headless BlockNote schema.
+
 ## Tooling
 
 - `tooling/quality`: deterministic gates and AI gate wrappers.

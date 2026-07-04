@@ -22,13 +22,17 @@
     "check:convex": "confect codegen && git diff --exit-code confect/_generated convex/_generated"
   },
   "dependencies": {
+    "@blocknote/core": "0.51.4",
     "@confect/cli": "9.1.5",
     "@confect/core": "9.1.5",
     "@confect/server": "9.1.5",
     "@confect/test": "9.1.5",
+    "@convex-dev/prosemirror-sync": "0.2.5",
     "@maestro-template/observability": "workspace:*",
     "@maestro-template/template-core": "workspace:*",
     "@maestro-template/workflow-tooling": "workspace:*",
+    "@tiptap/core": "3.27.1",
+    "@tiptap/pm": "3.27.1",
     "@convex-dev/migrations": "^0.3.5",
     "@convex-dev/workflow": "^0.4.4",
     "@convex-dev/workpool": "^0.4.7",

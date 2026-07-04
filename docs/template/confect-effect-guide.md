@@ -22,6 +22,20 @@ The goal is end-to-end typed contracts without losing Convex component support.
 | Effect runtime | `effect`, `@effect/platform`, `@effect/platform-node`, `@effect/cluster`, `@effect/vitest` | `3.21.4`, `0.96.2`, `0.106.0`, `0.58.0`, `0.29.0` | `@effect/platform-node@0.106.0` matches Confect's `^0.106.0` peer; `0.107.0` is intentionally not used.                                   |
 | Convex         | `convex`, `convex-test`                                                                    | `1.42.1`, `0.0.54`                                | Satisfies Confect peers and `@confect/test`'s `convex-test >=0.0.50 <0.1.0` peer.                                                         |
 
+## Editor Substrate Pins
+
+The editor substrate is exact-pinned to `@blocknote/core@0.51.4`,
+`@blocknote/react@0.51.4`, `@convex-dev/prosemirror-sync@0.2.5`,
+`@tiptap/core@3.27.1`, `@tiptap/pm@3.27.1`, and
+`decode-named-character-reference@1.3.0`.
+
+Before editing manifests for editor dependency bumps, recheck live npm metadata.
+Pin the BlockNote and Tiptap families together so ProseMirror schema and
+extension expectations move as one tested set. After any bump, run the
+ProseMirror schema drift test. The backend transform schema must be derived from
+a guarded headless `BlockNoteEditor.create().pmSchema` path rather than from
+duplicated hand-written ProseMirror schema assumptions.
+
 ## File Model
 
 - Tables: `packages/convex/confect/tables/*`
