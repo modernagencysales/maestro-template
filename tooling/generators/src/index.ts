@@ -1724,7 +1724,7 @@ ${description}
 
 ## Generated Files
 
-- \`packages/convex/convex/workflowRunners/${name}.ts\`: plain Convex durable replay handler.
+- \`packages/convex/convex/workflowRunners/${name}.ts\`: plain Convex \`defineWorkflow\` durable replay handler.
 - \`packages/convex/confect/workflowContracts/${name}.spec.ts\`: typed start, status, and approval contract.
 - \`packages/convex/confect/workflowContracts/${name}.impl.ts\`: Confect implementation that records workflow ownership and projects component status.
 - \`packages/convex/confect/workflows/${name}.graph.ts\`: durable graph data, initially source to Trust Receipt output only.

@@ -77,11 +77,12 @@ Failures:
 
 ## Durable Runtime Boundary
 
-Workflow replay handlers live in `packages/convex/convex/workflows/*.ts` and use
-`defineWorkflow(components.workflow, ...)`. Confect owns start, status, event,
-cancel, restart, cleanup, manifest, and capability step contracts. Do not move
-replay handlers into Confect impl files: the workflow component is the durable
-runtime, while Confect is the typed contract layer around it.
+Generated workflow replay handlers live in
+`packages/convex/convex/workflowRunners/*.ts` and are plain Convex
+`defineWorkflow(components.workflow, ...)` handlers. Confect owns start, status,
+event, cancel, restart, cleanup, manifest, and capability step contracts. Do not
+move replay handlers into Confect impl files: the workflow component is the
+durable runtime, while Confect is the typed contract layer around it.
 
 ## Reviewer-Safe Run Receipt
 

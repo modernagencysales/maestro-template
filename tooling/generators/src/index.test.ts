@@ -694,6 +694,9 @@ describe("template app factory generators", () => {
       "packages/convex/test/sourceGroundedPlan.workflow.test.ts",
       "docs/template/generated/workflows/sourceGroundedPlan.md",
     ]);
+    expect(generated.files[3]?.path).toBe(
+      "packages/convex/convex/workflowRunners/sourceGroundedPlan.ts",
+    );
     const spec = generated.files[0]?.content ?? "";
     const impl = generated.files[1]?.content ?? "";
     const graph = generated.files[2]?.content ?? "";
@@ -727,6 +730,7 @@ describe("template app factory generators", () => {
     expect(impl).toContain("startWorkflowAndRecordOwnership");
     expect(impl).toContain("makeFunctionReference");
     expect(impl).toContain('"workflowRunners/sourceGroundedPlan:run"');
+    expect(impl).not.toContain('"workflows/sourceGroundedPlan:run"');
     expect(impl).not.toContain("../../convex/_generated/api");
     expect(impl).toContain("toWorkflowValidationFailed");
     expect(impl).toContain("Effect.mapError(toWorkflowError)");
@@ -753,7 +757,13 @@ describe("template app factory generators", () => {
     expect(graph).not.toContain('kind: "capability"');
     expect(graph).not.toContain('kind: "approval"');
 
-    expect(docs).toContain("plain Convex durable replay handler");
+    expect(docs).toContain(
+      "packages/convex/convex/workflowRunners/sourceGroundedPlan.ts",
+    );
+    expect(docs).toContain(
+      "plain Convex `defineWorkflow` durable replay handler",
+    );
+    expect(docs).not.toContain("packages/convex/convex/workflows/");
     expect(docs).toContain("pnpm confect:codegen");
     expect(docs).toContain("pnpm --dir packages/convex exec convex codegen");
     expect(docs).toContain("workflowContracts.sourceGroundedPlan.approve");

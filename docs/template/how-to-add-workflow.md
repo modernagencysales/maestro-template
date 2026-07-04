@@ -34,10 +34,12 @@ pnpm template:promote-workflow -- --name sourceToBrief --description "Turns appr
 
 ## Files Created
 
-Generated workflows have two halves: `convex/workflowRunners/<name>.ts` is the
-durable replay handler and `confect/workflowContracts/<name>.{spec,impl}.ts` is
-the typed start/status/approval contract. React Flow remains a projection of
-durable graph data.
+Generated workflows have two halves:
+`packages/convex/convex/workflowRunners/<name>.ts` is the plain Convex
+`defineWorkflow` durable replay handler, and
+`packages/convex/confect/workflowContracts/<name>.{spec,impl}.ts` is the typed
+start/status/approval contract. React Flow remains a projection of durable graph
+data.
 
 `template:add-workflow` writes:
 
