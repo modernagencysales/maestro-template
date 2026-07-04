@@ -143,4 +143,44 @@ describe("workflow canvas state", () => {
       },
     );
   });
+
+  it("uses later same-attempt stage rows and clears stale run metadata", () => {
+    const staleModel = applyStatusOverlay(deriveWorkflowFlowModel(graph), [
+      {
+        nodeId: "brief",
+        status: "failed",
+        summary: "Previous failure",
+        errorCode: "PROVIDER_TIMEOUT",
+      },
+    ]);
+    const overlays = mapStageRunsToOverlay(
+      [
+        {
+          stageKey: "source_grounded_brief",
+          status: "running",
+          attemptNumber: 2,
+          summary: "Calling provider",
+        },
+        {
+          stageKey: "source_grounded_brief",
+          status: "succeeded",
+          attemptNumber: 2,
+          summary: null,
+          errorCode: null,
+        },
+      ],
+      { source_grounded_brief: "brief" },
+      ["source", "brief"],
+    );
+
+    const model = applyStatusOverlay(staleModel, overlays);
+
+    expect(model.nodes.find((node) => node.id === "brief")?.data).toEqual({
+      label: "capability: Source-grounded brief",
+      kind: "capability",
+      capability: "sourceGroundedBrief",
+      validationHints: [],
+      status: "completed",
+    });
+  });
 });

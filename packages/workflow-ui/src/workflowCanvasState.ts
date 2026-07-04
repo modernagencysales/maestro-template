@@ -220,7 +220,7 @@ export const mapStageRunsToOverlay = (
   const latestRuns = new Map<string, WorkflowStageRunForCanvas>();
   for (const run of stageRuns) {
     const current = latestRuns.get(run.stageKey);
-    if (current === undefined || run.attemptNumber > current.attemptNumber) {
+    if (current === undefined || run.attemptNumber >= current.attemptNumber) {
       latestRuns.set(run.stageKey, run);
     }
   }
@@ -265,10 +265,23 @@ export const applyStatusOverlay = (
       if (overlay === undefined) {
         return node;
       }
+      const data: WorkflowFlowNodeData = {
+        label: node.data.label,
+        kind: node.data.kind,
+        ...(node.data.capability !== undefined
+          ? { capability: node.data.capability }
+          : {}),
+        ...(node.data.agent !== undefined ? { agent: node.data.agent } : {}),
+        ...(node.data.delayMs !== undefined
+          ? { delayMs: node.data.delayMs }
+          : {}),
+        validationHints: node.data.validationHints,
+      };
+
       return {
         ...node,
         data: {
-          ...node.data,
+          ...data,
           status: overlay.status,
           ...(overlay.summary !== undefined
             ? { runSummary: overlay.summary }
