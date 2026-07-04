@@ -89,18 +89,18 @@ export const runCli = (argv: readonly string[]): CliResult => {
   }
 
   if (command === "capability" && subcommand === "run" && maybeId) {
+    const result = runTemplateApiOperation(maybeId, {
+      workspaceSlug: "acme-demo",
+      input: {
+        title: "CLI note",
+        markdown: "# CLI note",
+      },
+      idempotencyKey: `${maybeId}-cli-001`,
+    });
+
     return {
-      exitCode: 0,
-      stdout: json(
-        runTemplateApiOperation(maybeId, {
-          workspaceSlug: "acme-demo",
-          input: {
-            sourceIds: ["source_1"],
-            briefGoal: "Create a client implementation brief.",
-          },
-          idempotencyKey: `${maybeId}-cli-001`,
-        }),
-      ),
+      exitCode: result.ok ? 0 : 1,
+      stdout: json(result),
       stderr: "",
     };
   }

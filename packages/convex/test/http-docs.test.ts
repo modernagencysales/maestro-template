@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import templateHttp from "../confect/http";
 import {
+  type HeadlessHttpCtx,
   handleTemplateHttpRequest,
   securityHeaders,
   templateHttpRoutes,
@@ -8,6 +9,18 @@ import {
 
 const readJson = async (response: Response): Promise<unknown> =>
   JSON.parse(await response.text());
+
+const noopCtx: HeadlessHttpCtx = {
+  runQuery: async () => {
+    throw new Error("runQuery should not be called");
+  },
+  runMutation: async () => {
+    throw new Error("runMutation should not be called");
+  },
+  runAction: async () => {
+    throw new Error("runAction should not be called");
+  },
+};
 
 describe("template HTTP docs routes", () => {
   it("default-exports a Convex router covering every declared route", () => {
@@ -41,10 +54,9 @@ describe("template HTTP docs routes", () => {
           description: "Serves the Scalar API documentation shell.",
         },
         {
-          path: "/api/createTrustReceipt",
+          path: "/api/brain.pages.createMarkdown",
           method: "POST",
-          description:
-            "Executes createTrustReceipt through the shared template registry.",
+          description: "Executes brain.pages.createMarkdown.",
         },
       ]),
     );
@@ -52,6 +64,7 @@ describe("template HTTP docs routes", () => {
 
   it("serves generated OpenAPI JSON", async () => {
     const response = await handleTemplateHttpRequest(
+      noopCtx,
       new Request("https://template.local/api/openapi.json"),
     );
     const body = await readJson(response);
@@ -60,10 +73,10 @@ describe("template HTTP docs routes", () => {
     expect(body).toMatchObject({
       openapi: "3.1.0",
       paths: {
-        "/api/createTrustReceipt": {
+        "/api/brain.pages.createMarkdown": {
           post: {
-            operationId: "createTrustReceipt",
-            "x-maestro-auth-scope": "audited write",
+            operationId: "brain.pages.createMarkdown",
+            "x-maestro-auth-scope": "workspace member",
           },
         },
       },
@@ -72,11 +85,18 @@ describe("template HTTP docs routes", () => {
 
   it("applies security headers to every HTTP response", async () => {
     const responses = await Promise.all([
-      handleTemplateHttpRequest(new Request("https://template.local/api/docs")),
       handleTemplateHttpRequest(
+        noopCtx,
+        new Request("https://template.local/api/docs"),
+      ),
+      handleTemplateHttpRequest(
+        noopCtx,
         new Request("https://template.local/api/openapi.json"),
       ),
-      handleTemplateHttpRequest(new Request("https://template.local/missing")),
+      handleTemplateHttpRequest(
+        noopCtx,
+        new Request("https://template.local/missing"),
+      ),
     ]);
 
     for (const response of responses) {
@@ -94,6 +114,7 @@ describe("template HTTP docs routes", () => {
 
   it("serves a Scalar docs shell", async () => {
     const response = await handleTemplateHttpRequest(
+      noopCtx,
       new Request("https://template.local/api/docs"),
     );
     const html = await response.text();
@@ -103,15 +124,24 @@ describe("template HTTP docs routes", () => {
     expect(html).toContain('data-url="/api/openapi.json"');
   });
 
-  it("executes a generated API operation through the shared registry", async () => {
+  it("executes a generated API operation through the Convex adapter runner", async () => {
+    const calls: unknown[] = [];
+    const ctx: HeadlessHttpCtx = {
+      ...noopCtx,
+      runMutation: async (ref, input) => {
+        calls.push([ref, input]);
+        return { id: "brainPage_123", source: "adapter-runner" };
+      },
+    };
     const response = await handleTemplateHttpRequest(
-      new Request("https://template.local/api/createTrustReceipt", {
+      ctx,
+      new Request("https://template.local/api/brain.pages.createMarkdown", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           workspaceSlug: "acme-demo",
-          input: { sourceSetId: "source_set_template_001" },
-          idempotencyKey: "receipt-example-001",
+          input: { title: "A note", markdown: "# A note" },
+          idempotencyKey: "brain-page-example-001",
         }),
       }),
     );
@@ -119,20 +149,28 @@ describe("template HTTP docs routes", () => {
 
     expect(body).toMatchObject({
       ok: true,
-      operationId: "createTrustReceipt",
+      operationId: "brain.pages.createMarkdown",
       result: {
-        status: "accepted",
-        workspaceSlug: "acme-demo",
-        receiptId: "trust_run_template_001",
-        workflowRunId: "run_template_001",
+        id: "brainPage_123",
+        source: "adapter-runner",
       },
     });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject([
+      expect.anything(),
+      {
+        title: "A note",
+        markdown: "# A note",
+        idempotencyKey: "brain-page-example-001",
+      },
+    ]);
   });
 
   it("returns typed validation errors for generated API operations", async () => {
     const body = await readJson(
       await handleTemplateHttpRequest(
-        new Request("https://template.local/api/createTrustReceipt", {
+        noopCtx,
+        new Request("https://template.local/api/brain.pages.createMarkdown", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
@@ -147,7 +185,8 @@ describe("template HTTP docs routes", () => {
       ok: false,
       error: {
         _tag: "ValidationFailed",
-        message: "idempotencyKey is required for write operations.",
+        message:
+          "Operation brain.pages.createMarkdown requires a nonblank idempotencyKey.",
       },
     });
   });
@@ -155,11 +194,13 @@ describe("template HTTP docs routes", () => {
   it("returns typed route errors for invalid HTTP requests", async () => {
     const method = await readJson(
       await handleTemplateHttpRequest(
+        noopCtx,
         new Request("https://template.local/api/docs", { method: "POST" }),
       ),
     );
     const missing = await readJson(
       await handleTemplateHttpRequest(
+        noopCtx,
         new Request("https://template.local/nope"),
       ),
     );

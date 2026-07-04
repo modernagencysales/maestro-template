@@ -9,45 +9,52 @@ describe("maestro-template CLI", () => {
     expect(JSON.parse(result.stdout)).toMatchObject({
       valid: true,
       capabilityCount: 4,
-      headlessOperationCount: 12,
+      headlessOperationCount: 11,
     });
   });
 
   it("lists and gets headless operations", () => {
     const list = runCli(["operations", "list"]);
-    const get = runCli(["operations", "get", "CLI:createTrustReceipt"]);
+    const operations = JSON.parse(list.stdout);
+    const get = runCli(["operations", "get", "api:brain.pages.createMarkdown"]);
 
-    expect(JSON.parse(list.stdout)).toHaveLength(12);
+    expect(operations).toHaveLength(11);
+    expect(
+      operations.map((operation: { id: string }) => operation.id),
+    ).toContain("api:brain.pages.createMarkdown");
+    expect(
+      operations.map((operation: { id: string }) => operation.id),
+    ).not.toContain("CLI:createTrustReceipt");
     expect(JSON.parse(get.stdout)).toMatchObject({
-      surface: "CLI",
-      capability: "createTrustReceipt",
-      authScope: "audited write",
+      surface: "api",
+      capability: "brain.pages.createMarkdown",
+      authScope: "workspace member",
     });
   });
 
   it("prints API and MCP metadata", () => {
     expect(JSON.parse(runCli(["api", "catalog"]).stdout)).toContainEqual(
       expect.objectContaining({
+        operationId: "brain.pages.createMarkdown",
+        path: "/api/brain.pages.createMarkdown",
+      }),
+    );
+    expect(JSON.parse(runCli(["api", "catalog"]).stdout)).not.toContainEqual(
+      expect.objectContaining({
         operationId: "resolveSourceSet",
-        path: "/api/resolveSourceSet",
       }),
     );
     expect(JSON.parse(runCli(["api", "openapi"]).stdout)).toMatchObject({
       openapi: "3.1.0",
       paths: {
-        "/api/sourceGroundedBrief": {
+        "/api/brain.pages.createMarkdown": {
           post: {
-            operationId: "sourceGroundedBrief",
-          },
-        },
-        "/api/resolveSourceSet": {
-          post: {
-            operationId: "resolveSourceSet",
+            operationId: "brain.pages.createMarkdown",
             "x-maestro-auth-scope": "workspace member",
             "x-maestro-typed-errors": [
               "Unauthorized",
+              "MemberNotInWorkspace",
               "WorkspaceNotFound",
-              "ValidationFailed",
             ],
           },
         },
@@ -55,15 +62,12 @@ describe("maestro-template CLI", () => {
     });
     expect(JSON.parse(runCli(["mcp", "tools"]).stdout)).toContainEqual(
       expect.objectContaining({
-        name: "template.sourceGroundedBrief",
+        name: "template.brain.pages.createMarkdown",
         inputSchema: expect.objectContaining({ type: "object" }),
       }),
     );
-    expect(JSON.parse(runCli(["mcp", "tools"]).stdout)).toContainEqual(
-      expect.objectContaining({
-        name: "template.resolveSourceSet",
-        inputSchema: expect.objectContaining({ type: "object" }),
-      }),
+    expect(JSON.parse(runCli(["mcp", "tools"]).stdout)).not.toContainEqual(
+      expect.objectContaining({ name: "template.resolveSourceSet" }),
     );
   });
 
@@ -113,27 +117,27 @@ describe("maestro-template CLI", () => {
   });
 
   it("runs the source-grounded brief capability from the CLI", () => {
-    const result = runCli(["capability", "run", "sourceGroundedBrief"]);
+    const result = runCli(["capability", "run", "brain.pages.createMarkdown"]);
     const payload = JSON.parse(result.stdout);
 
-    expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(1);
     expect(payload).toMatchObject({
-      ok: true,
-      operationId: "sourceGroundedBrief",
-      result: {
-        status: "accepted",
-        trustClaim: "source-backed-no-default-rag",
+      ok: false,
+      error: {
+        _tag: "FeatureDisabled",
+        message:
+          "Operation brain.pages.createMarkdown requires a runtime execution adapter.",
       },
     });
   });
 
   it("returns a clear error for unknown operations", () => {
-    const result = runCli(["operations", "get", "CLI:nope"]);
+    const result = runCli(["operations", "get", "cli:nope"]);
 
     expect(result).toEqual({
       exitCode: 1,
       stdout: "",
-      stderr: "Unknown operation: CLI:nope\n",
+      stderr: "Unknown operation: cli:nope\n",
     });
   });
 });

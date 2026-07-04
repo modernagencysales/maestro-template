@@ -10,5 +10,6 @@ export {
   handleTemplateHttpRequest,
   securityHeaders,
   templateHttpRoutes,
+  type HeadlessHttpCtx,
   type TemplateHttpRoute,
 } from "../confect/http";

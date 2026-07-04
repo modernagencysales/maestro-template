@@ -2,16 +2,24 @@ import {
   createSampleWorkflowRunReceipt,
   templateRegistry,
   validateTemplateRegistry,
-  type CapabilityDefinition,
-  type HeadlessSurface,
   type TemplateRegistry,
   type WorkflowRunReceipt,
 } from "@maestro-template/template-core";
+import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";
+
+type ManifestFunction = (typeof confectManifest.functions)[number];
+type ManifestSurface = ManifestFunction["surfaces"][number];
+
+const hasSurface = (
+  entry: ManifestFunction,
+  surface: string,
+): surface is ManifestSurface =>
+  (entry.surfaces as readonly string[]).includes(surface);
 
 export type HeadlessOperation = {
   readonly id: string;
-  readonly surface: HeadlessSurface["name"];
-  readonly capability: CapabilityDefinition["name"];
+  readonly surface: ManifestSurface;
+  readonly capability: ManifestFunction["operationId"];
   readonly route: string;
   readonly authScope: string;
   readonly typedErrors: readonly string[];
@@ -130,16 +138,17 @@ export type McpToolCallResult = {
 };
 
 export const buildHeadlessOperations = (
-  registry: TemplateRegistry = templateRegistry,
+  _registry: TemplateRegistry = templateRegistry,
 ): readonly HeadlessOperation[] =>
-  registry.headlessSurfaces.flatMap((surface) =>
-    registry.capabilities.map((capability) => ({
-      id: `${surface.name}:${capability.name}`,
-      surface: surface.name,
-      capability: capability.name,
-      route: surface.route,
-      authScope: capability.policy,
-      typedErrors: capability.typedErrors,
+  confectManifest.functions.flatMap((entry) =>
+    entry.surfaces.map((surface) => ({
+      id: `${surface}:${entry.operationId}`,
+      surface,
+      capability: entry.operationId,
+      route:
+        surface === "api" ? `/api/${entry.operationId}` : entry.operationId,
+      authScope: "workspace member",
+      typedErrors: entry.typedErrors,
     })),
   );
 
@@ -153,7 +162,7 @@ export const describeWorkflowTemplate = (
     validationErrors,
     nodeCount: registry.workflow.nodes.length,
     edgeCount: registry.workflow.edges.length,
-    capabilityCount: registry.capabilities.length,
+    capabilityCount: confectManifest.functions.length,
     agentCount: registry.agents.length,
     headlessOperationCount: buildHeadlessOperations(registry).length,
   };
@@ -166,16 +175,16 @@ export const getHeadlessOperation = (
   buildHeadlessOperations(registry).find((operation) => operation.id === id);
 
 export const buildApiCatalog = (
-  registry: TemplateRegistry = templateRegistry,
+  _registry: TemplateRegistry = templateRegistry,
 ): readonly ApiCatalogEntry[] =>
-  buildHeadlessOperations(registry)
-    .filter((operation) => operation.surface === "Scalar API")
-    .map((operation) => ({
-      operationId: operation.capability,
+  confectManifest.functions
+    .filter((entry) => hasSurface(entry, "api"))
+    .map((entry) => ({
+      operationId: entry.operationId,
       method: "POST",
-      path: `/api/${operation.capability}`,
-      authScope: operation.authScope,
-      typedErrors: operation.typedErrors,
+      path: `/api/${entry.operationId}`,
+      authScope: "workspace member",
+      typedErrors: entry.typedErrors,
     }));
 
 const baseRequestSchema: JsonSchema = {
@@ -270,11 +279,8 @@ const apiExampleFor = (
     ok: true,
     operationId: entry.operationId,
     result: {
-      receiptId:
-        entry.operationId === "createTrustReceipt"
-          ? "trust_run_template_001"
-          : undefined,
       status: "accepted",
+      id: "generated_result_example",
     },
   },
   typedError: {
@@ -297,7 +303,7 @@ export const buildOpenApiDocument = (
       title: "Maestro Template Headless API",
       version: "0.1.0",
       description:
-        "Generated from the shared template registry. The live Confect HTTP implementation mounts the same operations for Scalar.",
+        "Generated from the Confect manifest. The live Confect HTTP implementation mounts the same operations for Scalar.",
     },
     paths: Object.fromEntries(
       apiEntries.map((entry) => {
@@ -371,9 +377,9 @@ export const buildOpenApiDocument = (
 export const runTemplateApiOperation = (
   operationId: string,
   request: TemplateApiRequest = {},
-  registry: TemplateRegistry = templateRegistry,
+  _registry: TemplateRegistry = templateRegistry,
 ): TemplateApiResult => {
-  const operation = buildApiCatalog(registry).find(
+  const operation = buildApiCatalog(_registry).find(
     (entry) => entry.operationId === operationId,
   );
 
@@ -399,81 +405,41 @@ export const runTemplateApiOperation = (
     };
   }
 
+  const manifestEntry = confectManifest.functions.find(
+    (entry) => entry.operationId === operationId,
+  );
+
   if (
-    operation.authScope.includes("write") &&
+    manifestEntry &&
+    !manifestEntry.idempotent &&
     !request.idempotencyKey?.trim()
   ) {
     return {
       ok: false,
       error: {
         _tag: "ValidationFailed",
-        message: "idempotencyKey is required for write operations.",
-      },
-    };
-  }
-
-  if (operationId === "createTrustReceipt") {
-    const receipt = runTemplateWorkflow(registry);
-
-    return {
-      ok: true,
-      operationId,
-      result: {
-        status: "accepted",
-        workspaceSlug,
-        receiptId: receipt.trustReceipt.receiptId,
-        claim: receipt.trustReceipt.claim,
-        sourceTitles: receipt.trustReceipt.sourceTitles,
-        workflowRunId: receipt.runId,
-      },
-    };
-  }
-
-  if (operationId === "sourceGroundedBrief") {
-    const sourceTitles = registry.brainSources.map((source) => source.title);
-
-    return {
-      ok: true,
-      operationId,
-      result: {
-        status: "accepted",
-        workspaceSlug,
-        briefMarkdown: [
-          "# Source-Grounded Implementation Brief",
-          "",
-          "This deterministic template response shows the contract shape used by the Confect capability implementation.",
-          "",
-          "## Grounding",
-          ...sourceTitles.map((title) => `- ${title}`),
-        ].join("\n"),
-        sourceTitles,
-        policySnapshotId: "policy_snapshot_template_default",
-        modelReceiptId: "model_receipt_template_fake_local",
-        trustClaim: "source-backed-no-default-rag",
+        message: `Operation ${operationId} requires a nonblank idempotencyKey.`,
       },
     };
   }
 
   return {
-    ok: true,
-    operationId,
-    result: {
-      status: "accepted",
-      workspaceSlug,
-      source: "shared-template-registry",
-      inputEcho: request.input ?? {},
+    ok: false,
+    error: {
+      _tag: "FeatureDisabled",
+      message: `Operation ${operationId} requires a runtime execution adapter.`,
     },
   };
 };
 
 export const buildMcpTools = (
-  registry: TemplateRegistry = templateRegistry,
+  _registry: TemplateRegistry = templateRegistry,
 ): readonly McpToolEntry[] => [
-  ...buildHeadlessOperations(registry)
-    .filter((operation) => operation.surface === "MCP")
+  ...buildHeadlessOperations()
+    .filter((operation) => operation.surface === "mcp")
     .map((operation) => ({
       name: `template.${operation.capability}`,
-      description: `Invoke ${operation.capability} through the shared template registry.`,
+      description: `Invoke ${operation.capability} through the generated manifest.`,
       inputSchema: mcpInputSchema,
       typedErrors: operation.typedErrors,
     })),
@@ -528,40 +494,24 @@ export const callMcpTool = (
     return mcpText(runTemplateWorkflow(registry));
   }
 
-  const capability = registry.capabilities.find(
-    (candidate) => `template.${candidate.name}` === toolName,
+  const operation = confectManifest.functions.find(
+    (candidate) =>
+      hasSurface(candidate, "mcp") &&
+      `template.${candidate.operationId}` === toolName,
   );
 
-  if (!capability) {
+  if (!operation) {
     return mcpError(`Unknown MCP tool: ${toolName}`);
   }
 
-  if (capability.name === "sourceGroundedBrief") {
-    return mcpText({
-      ok: true,
-      toolName,
-      capability: capability.name,
-      policy: capability.policy,
-      typedErrors: capability.typedErrors,
-      result: {
-        status: "accepted",
-        sourceTitles: registry.brainSources.map((source) => source.title),
-        policySnapshotId: "policy_snapshot_template_default",
-        modelReceiptId: "model_receipt_template_fake_local",
-        trustClaim: "source-backed-no-default-rag",
-      },
-    });
-  }
-
   return mcpText({
-    ok: true,
+    ok: false,
     toolName,
-    capability: capability.name,
-    policy: capability.policy,
-    typedErrors: capability.typedErrors,
-    result: {
-      status: "accepted",
-      source: "shared-template-registry",
+    capability: operation.operationId,
+    typedErrors: operation.typedErrors,
+    error: {
+      _tag: "FeatureDisabled",
+      message: `MCP operation ${operation.operationId} requires a runtime execution adapter.`,
     },
   });
 };
