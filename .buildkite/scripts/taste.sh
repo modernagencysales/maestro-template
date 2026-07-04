@@ -28,7 +28,7 @@ export TASTE_REVIEW_WORKTREE="$(pwd)"
 
 TRUSTED_TREE="$(mktemp -d)"
 trap 'rm -rf "$TRUSTED_TREE"' EXIT
-git archive "origin/${BASE_BRANCH}" .buildkite tooling/quality package.json pnpm-lock.yaml pnpm-workspace.yaml |
+git archive "origin/${BASE_BRANCH}" AGENTS.md .buildkite dependency-cruiser.config.cjs docs/template/coding-standards.md eslint.config.mjs tooling/quality package.json pnpm-lock.yaml pnpm-workspace.yaml |
   tar -x -C "$TRUSTED_TREE"
 
 LOG_FILE="$(mktemp)"
