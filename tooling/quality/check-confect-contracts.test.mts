@@ -39,6 +39,25 @@ describe("check:confect-contracts", () => {
     ).toBeUndefined();
   });
 
+  it("rejects public specs with error text only in strings or comments", () => {
+    expect(
+      publicSpecMissingError(
+        `const run = FunctionSpec.publicQuery({
+          name: 'run',
+          description: "error:",
+        });`,
+      ),
+    ).toContain("typed error");
+    expect(
+      publicSpecMissingError(
+        `const run = FunctionSpec.publicQuery({
+          name: 'run',
+          /* error: */
+        });`,
+      ),
+    ).toContain("typed error");
+  });
+
   it("rejects ambient time in impls", () => {
     expect(ambientDateNow("const now = Date.now();")).toContain("Date.now");
   });

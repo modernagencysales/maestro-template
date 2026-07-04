@@ -1,5 +1,6 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
+import ts from "typescript";
 import { descriptorFor } from "./src/check-definitions.mts";
 import { isDirectRun } from "./src/direct-run.mts";
 import { runStaticCheck } from "./src/gate.mts";
@@ -23,6 +24,8 @@ const publicSpecConstructors = [
   "publicAction",
   "publicNodeAction",
 ] as const;
+
+const publicSpecConstructorNames = new Set<string>(publicSpecConstructors);
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -52,86 +55,85 @@ async function walk(root: string, dir: string): Promise<string[]> {
   return files;
 }
 
-function findBalancedCallObject(
-  source: string,
-  openBraceIndex: number,
-): string | undefined {
-  let depth = 0;
-  let quote: '"' | "'" | "`" | undefined;
-  let escaped = false;
-  let lineComment = false;
-  let blockComment = false;
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
 
-  for (let index = openBraceIndex; index < source.length; index += 1) {
-    const current = source[index];
-    const next = source[index + 1];
-
-    if (lineComment) {
-      if (current === "\n") lineComment = false;
-      continue;
-    }
-
-    if (blockComment) {
-      if (current === "*" && next === "/") {
-        blockComment = false;
-        index += 1;
-      }
-      continue;
-    }
-
-    if (quote) {
-      if (escaped) {
-        escaped = false;
-      } else if (current === "\\") {
-        escaped = true;
-      } else if (current === quote) {
-        quote = undefined;
-      }
-      continue;
-    }
-
-    if (current === "/" && next === "/") {
-      lineComment = true;
-      index += 1;
-      continue;
-    }
-
-    if (current === "/" && next === "*") {
-      blockComment = true;
-      index += 1;
-      continue;
-    }
-
-    if (current === '"' || current === "'" || current === "`") {
-      quote = current;
-      continue;
-    }
-
-    if (current === "{") depth += 1;
-    if (current === "}") {
-      depth -= 1;
-      if (depth === 0) return source.slice(openBraceIndex, index + 1);
-    }
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
   }
 
+  return current;
+}
+
+function propertyNameText(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
   return undefined;
 }
 
+function isPublicFunctionSpecCall(node: ts.CallExpression): boolean {
+  if (!ts.isPropertyAccessExpression(node.expression)) return false;
+
+  return (
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === "FunctionSpec" &&
+    publicSpecConstructorNames.has(node.expression.name.text)
+  );
+}
+
+function hasTopLevelErrorProperty(input: ts.ObjectLiteralExpression): boolean {
+  return input.properties.some((property) => {
+    if (
+      ts.isPropertyAssignment(property) ||
+      ts.isMethodDeclaration(property) ||
+      ts.isShorthandPropertyAssignment(property)
+    ) {
+      return propertyNameText(property.name) === "error";
+    }
+
+    return false;
+  });
+}
+
 export function publicSpecMissingError(source: string): string | undefined {
-  for (const constructor of publicSpecConstructors) {
-    const pattern = new RegExp(
-      `FunctionSpec\\.${constructor}\\s*\\(\\s*\\{`,
-      "g",
-    );
+  const sourceFile = ts.createSourceFile(
+    "confect-spec.ts",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
 
-    for (const match of source.matchAll(pattern)) {
-      const openBraceIndex = match.index + match[0].lastIndexOf("{");
-      const input = findBalancedCallObject(source, openBraceIndex);
+  let missingConstructor: string | undefined;
 
-      if (input !== undefined && !/\berror\s*:/.test(input)) {
-        return `Public Confect ${constructor} must declare a typed error with \`error:\`.`;
+  const visit = (node: ts.Node): void => {
+    if (missingConstructor !== undefined) return;
+
+    if (ts.isCallExpression(node) && isPublicFunctionSpecCall(node)) {
+      const constructor = (node.expression as ts.PropertyAccessExpression).name
+        .text;
+      const input = node.arguments[0]
+        ? unwrapExpression(node.arguments[0])
+        : undefined;
+
+      if (input !== undefined && ts.isObjectLiteralExpression(input)) {
+        if (!hasTopLevelErrorProperty(input)) {
+          missingConstructor = constructor;
+          return;
+        }
       }
     }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+
+  if (missingConstructor !== undefined) {
+    return `Public Confect ${missingConstructor} must declare a typed error with \`error:\`.`;
   }
 
   return undefined;
