@@ -1,4 +1,5 @@
 import * as S from "effect/Schema";
+import { ConvexError } from "convex/values";
 
 export const WorkflowNodeKind = S.Literal(
   "source",
@@ -298,6 +299,12 @@ export type WorkflowConditionContext = {
   readonly policySnapshot: unknown;
 };
 
+const conditionExpressionError = (message: string) =>
+  new ConvexError({
+    code: "INVALID_WORKFLOW_CONDITION_EXPRESSION",
+    message,
+  });
+
 export const isSafeConditionExpression = (expression: string): boolean => {
   try {
     parseConditionExpression(expression);
@@ -355,12 +362,14 @@ const tokenizeConditionExpression = (
     }
 
     if (char === "=") {
-      throw new Error("assignments and loose equality are not allowed");
+      throw conditionExpressionError(
+        "assignments and loose equality are not allowed",
+      );
     }
 
     if (char === "!") {
       if (expression[index + 1] === "=") {
-        throw new Error("loose inequality is not allowed");
+        throw conditionExpressionError("loose inequality is not allowed");
       }
       tokens.push({ type: "operator", value: "!" });
       index += 1;
@@ -383,7 +392,7 @@ const tokenizeConditionExpression = (
     if (/[0-9]/.test(char)) {
       const match = /^[0-9]+(?:\.[0-9]+)?/.exec(expression.slice(index));
       if (!match) {
-        throw new Error("invalid number literal");
+        throw conditionExpressionError("invalid number literal");
       }
       tokens.push({ type: "number", value: Number(match[0]) });
       index += match[0].length;
@@ -395,14 +404,14 @@ const tokenizeConditionExpression = (
         expression.slice(index),
       );
       if (!match) {
-        throw new Error("invalid identifier");
+        throw conditionExpressionError("invalid identifier");
       }
       tokens.push({ type: "identifier", value: match[0] });
       index += match[0].length;
       continue;
     }
 
-    throw new Error(`unsupported condition token: ${char}`);
+    throw conditionExpressionError(`unsupported condition token: ${char}`);
   }
 
   tokens.push({ type: "eof" });
@@ -425,7 +434,7 @@ const readStringLiteral = (
     if (char === "\\") {
       const escaped = expression[index + 1];
       if (!escaped || !["\\", "'", '"', "n", "r", "t"].includes(escaped)) {
-        throw new Error("unsupported string escape");
+        throw conditionExpressionError("unsupported string escape");
       }
       value +=
         escaped === "n"
@@ -442,7 +451,7 @@ const readStringLiteral = (
     index += 1;
   }
 
-  throw new Error("unterminated string literal");
+  throw conditionExpressionError("unterminated string literal");
 };
 
 class ConditionParser {
@@ -456,7 +465,7 @@ class ConditionParser {
 
   expectEof(): void {
     if (this.peek().type !== "eof") {
-      throw new Error("unexpected trailing condition token");
+      throw conditionExpressionError("unexpected trailing condition token");
     }
   }
 
@@ -522,10 +531,14 @@ class ConditionParser {
         root !== "context" &&
         root !== "policySnapshot"
       ) {
-        throw new Error(`unsupported condition identifier: ${root ?? ""}`);
+        throw conditionExpressionError(
+          `unsupported condition identifier: ${root ?? ""}`,
+        );
       }
       if (path.includes("constructor") || path.includes("__proto__")) {
-        throw new Error("constructor and prototype access are not allowed");
+        throw conditionExpressionError(
+          "constructor and prototype access are not allowed",
+        );
       }
       return { type: "identifier", path };
     }
@@ -538,12 +551,12 @@ class ConditionParser {
       const ast = this.parseExpression();
       const closing = this.peek();
       if (closing.type !== "paren" || closing.value !== ")") {
-        throw new Error("missing closing parenthesis");
+        throw conditionExpressionError("missing closing parenthesis");
       }
       this.index += 1;
       return ast;
     }
-    throw new Error("expected condition primary expression");
+    throw conditionExpressionError("expected condition primary expression");
   }
 
   private matchOperator(operator: "===" | "!==" | "&&" | "||" | "!"): boolean {
