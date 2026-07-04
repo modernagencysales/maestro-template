@@ -62,6 +62,24 @@ const pageIdFromHash = (hashValue: string) => {
   return pageById.has(pageId) ? pageId : fallbackPageId;
 };
 
+const toRenderedPage = (page: DocumentPage): RenderedDocumentPage => {
+  const { diagram, ...documentPage } = page;
+
+  if (!diagram) {
+    return documentPage;
+  }
+
+  return {
+    ...documentPage,
+    diagramLabel: diagram.label,
+    diagram: diagram.graph ? (
+      <WorkflowGraphCanvas graph={diagram.graph} />
+    ) : (
+      <WorkflowCanvas nodes={diagram.nodes ?? []} edges={diagram.edges ?? []} />
+    ),
+  };
+};
+
 export function App() {
   const [activePageId, setActivePageId] = useState<string>(() =>
     typeof window === "undefined"
@@ -70,26 +88,6 @@ export function App() {
   );
   const activePage = pageById.get(activePageId) ?? overviewPage;
   const activeRouteKey = pageIdToRouteKey.get(activePage.id) ?? "home";
-  const toRenderedPage = (page: DocumentPage): RenderedDocumentPage => {
-    const { diagram, ...documentPage } = page;
-
-    if (!diagram) {
-      return documentPage;
-    }
-
-    return {
-      ...documentPage,
-      diagramLabel: diagram.label,
-      diagram: diagram.graph ? (
-        <WorkflowGraphCanvas graph={diagram.graph} />
-      ) : (
-        <WorkflowCanvas
-          nodes={diagram.nodes ?? []}
-          edges={diagram.edges ?? []}
-        />
-      ),
-    };
-  };
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -118,6 +116,9 @@ export function App() {
           onNavigate={(key) => {
             const pageId = routeKeyToPageId.get(key) ?? "overview";
 
+            if (typeof window !== "undefined") {
+              window.location.hash = pageId;
+            }
             setActivePageId(pageId);
           }}
         >

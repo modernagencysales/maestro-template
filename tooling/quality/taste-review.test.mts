@@ -444,9 +444,9 @@ describe("taste review concurrency", () => {
   });
 
   it("defaults taste review concurrency to a small bounded worker pool", () => {
-    expect(tasteReviewConcurrency({})).toBe(4);
+    expect(tasteReviewConcurrency({})).toBe(1);
     expect(tasteReviewConcurrency({ TASTE_REVIEW_CONCURRENCY: "2" })).toBe(2);
-    expect(tasteReviewConcurrency({ TASTE_REVIEW_CONCURRENCY: "0" })).toBe(4);
+    expect(tasteReviewConcurrency({ TASTE_REVIEW_CONCURRENCY: "0" })).toBe(1);
     expect(tasteReviewConcurrency({ TASTE_REVIEW_CONCURRENCY: "99" })).toBe(25);
   });
 });

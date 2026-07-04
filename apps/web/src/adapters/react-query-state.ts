@@ -31,7 +31,7 @@ export type ReactQueryLikeResult<T> =
 export function normalizeReactQueryResult<T>(
   result: ReactQueryLikeResult<T>,
   options: NormalizeOptions<T> = {},
-): TemplateDataState<T, never> {
+): TemplateDataState<T, unknown> {
   if (result.status === "pending") {
     return { status: "loading" };
   }

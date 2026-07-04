@@ -55,22 +55,25 @@ export const openApiDocument = buildOpenApiDocument(templateRegistry);
 const buildOpenApiSummary = (
   document: OpenApiDocument,
   primaryOperationPath: string,
+  docsRoute: string,
 ): OpenApiSummary => {
   const primaryOperation = document.paths[primaryOperationPath]?.post;
 
   return {
     version: document.openapi,
     operationCount: Object.keys(document.paths).length,
-    docsRoute:
-      templateRegistry.headlessSurfaces.find(
-        (surface) => surface.name === "Scalar API",
-      )?.route ?? "/api/docs",
+    docsRoute,
     typedErrors: primaryOperation?.["x-maestro-typed-errors"] ?? [],
     authScope: primaryOperation?.["x-maestro-auth-scope"] ?? "unknown",
   };
 };
 
+const scalarApiDocsRoute =
+  headlessSurfaces.find((surface) => surface.name === "Scalar API")?.route ??
+  "/api/docs";
+
 export const openApiSummary = buildOpenApiSummary(
   openApiDocument,
   "/api/brain.pages.createMarkdown",
+  scalarApiDocsRoute,
 );
