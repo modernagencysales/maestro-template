@@ -19,6 +19,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      "@maestro-template/template-core/generated/confectManifest":
+        fileURLToPath(
+          new URL(
+            "../../packages/template-core/src/generated/confectManifest.ts",
+            import.meta.url,
+          ),
+        ),
       "@maestro-template/ui": fileURLToPath(
         new URL("../../packages/ui/src/index.tsx", import.meta.url),
       ),

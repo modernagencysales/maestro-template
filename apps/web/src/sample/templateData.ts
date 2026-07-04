@@ -53,6 +53,7 @@ export const safetyChecklist = templateRegistry.safetyChecklist;
 export const sampleRunReceipt =
   createSampleWorkflowRunReceipt(templateRegistry);
 export const openApiDocument = buildOpenApiDocument(templateRegistry);
+const primaryApiOperationPath = "/api/brain.pages.createMarkdown";
 export const openApiSummary = {
   version: openApiDocument.openapi,
   operationCount: Object.keys(openApiDocument.paths).length,
@@ -61,11 +62,11 @@ export const openApiSummary = {
       (surface) => surface.name === "Scalar API",
     )?.route ?? "/api/docs",
   typedErrors:
-    openApiDocument.paths["/api/createTrustReceipt"]?.post[
+    openApiDocument.paths[primaryApiOperationPath]?.post[
       "x-maestro-typed-errors"
     ] ?? [],
   authScope:
-    openApiDocument.paths["/api/createTrustReceipt"]?.post[
+    openApiDocument.paths[primaryApiOperationPath]?.post[
       "x-maestro-auth-scope"
     ] ?? "unknown",
 } as const;
