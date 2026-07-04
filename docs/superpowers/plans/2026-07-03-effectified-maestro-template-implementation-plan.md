@@ -3,7 +3,9 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use
-> checkbox (`- [ ]`) syntax for tracking.
+> checkbox (`- [ ]`) syntax for tracking. After execution, preserve those
+> checkboxes as the original implementation trace; the authoritative completion
+> ledger lives in `docs/template/effectification-status.md`.
 
 **Goal:** Convert `maestro-template` into an Effect/Confect-rooted application
 template where schemas, typed errors, tenancy, headless surfaces, generators,
@@ -24,7 +26,7 @@ template packages, and exposed through Confect/plain-Convex seams without
 leaking product-specific Maestro code.
 
 **Tech Stack:** TypeScript, pnpm, Turbo, Convex `1.42.1`, repo-pinned Confect
-`9.1.4` with a v9 patch checkpoint below, Effect `3.21.4`, `@effect/vitest`,
+`9.1.5` after the v9 patch checkpoint below, Effect `3.21.4`, `@effect/vitest`,
 `@confect/test`, `convex-test`, `@convex-dev/workflow` `0.4.4`, exact-pinned
 editor packages after the version checkpoint, React `19.1.0`, the current
 TanStack Router/Start shell under explicit evaluation, Vitest, fast-check,
@@ -84,9 +86,9 @@ dependency-cruiser.
   `packages/convex/test/confect-contracts.test.ts` checks generated refs and
   public-safe error encoding but does not run generated refs.
 - Current v9 package state: `packages/convex/package.json`,
-  `apps/web/package.json`, and `apps/cli/package.json` already pin Confect
-  packages at `9.1.4`; the plan adds gates that keep v9 authoring rules from
-  regressing.
+  `apps/web/package.json`, `apps/cli/package.json`, and
+  `tooling/effectified-api-proof/package.json` pin Confect packages at `9.1.5`;
+  the plan adds gates that keep v9 authoring rules from regressing.
 - Current canned headless registry: `packages/template-core/src/index.ts`,
   `tooling/workflow/src/index.ts`, `packages/convex/confect/http.ts`, and
   `apps/cli/src/index.ts`.
@@ -153,7 +155,7 @@ dependency-cruiser.
   TanStack `QueryClient`, TanStack Router, and `setupRouterSsrQueryIntegration`;
   `apps/web/package.json` pins `@tanstack/react-query` `5.101.0`,
   `@tanstack/react-router` `1.170.16`, `@tanstack/react-start` `1.168.26`,
-  `@confect/react` `9.1.4`, and `effect` `3.21.4`.
+  `@confect/react` `9.1.5`, and `effect` `3.21.4`.
 - Effect Atom package metadata checked on 2026-07-03: `@effect-atom/atom-react`
   latest `0.5.0` depends on `@effect-atom/atom:^0.5.0` and peers `effect:^3.19`,
   React `>=18 <20`, and `scheduler:*`; `@effect-atom/atom` latest `0.5.3` peers
@@ -283,7 +285,7 @@ editing package manifests because patch releases are moving:
 
 | Package family                 | Repo/plan pin                   | Latest observed                                                                                                                   | Reviewer decision                                                                                                                                                                                   |
 | ------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@confect/*`                   | repo pins `9.1.4`               | npm reported `9.1.5` for `@confect/core`, `@confect/server`, `@confect/react`, `@confect/test`, `@confect/cli`, and `@confect/js` | Either bump all Confect packages together to the latest v9 patch in Task 2A, or keep `9.1.4` and document why. Do not mix Confect patch versions.                                                   |
+| `@confect/*`                   | repo pins `9.1.5`               | npm reported `9.1.5` for `@confect/core`, `@confect/server`, `@confect/react`, `@confect/test`, `@confect/cli`, and `@confect/js` | Accepted the latest observed v9 patch in Task 2A. Do not mix Confect patch versions.                                                                                                                |
 | `@convex-dev/workflow`         | `^0.4.4` / plan runtime `0.4.4` | npm reported `0.4.4`                                                                                                              | Keep unless a newer release appears.                                                                                                                                                                |
 | `@effect-atom/atom-react`      | opt-in, not default             | npm reported `0.5.0`                                                                                                              | Only add behind an adapter and bundle gate.                                                                                                                                                         |
 | `confect-workflow`             | not a dependency                | npm reported `0.0.0-alpha.3` with Confect v3 peers                                                                                | Prior art only unless a v9-compatible release exists and is proven.                                                                                                                                 |
@@ -629,9 +631,9 @@ Create `tooling/effectified-api-proof/package.json`:
     "typecheck": "tsc --noEmit --module NodeNext --moduleResolution NodeNext --target ES2022 --jsx react-jsx --skipLibCheck *.ts"
   },
   "dependencies": {
-    "@confect/core": "9.1.4",
-    "@confect/server": "9.1.4",
-    "@confect/test": "9.1.4",
+    "@confect/core": "9.1.5",
+    "@confect/server": "9.1.5",
+    "@confect/test": "9.1.5",
     "@convex-dev/workflow": "0.4.4",
     "convex": "1.42.1",
     "effect": "3.21.4"
@@ -643,17 +645,16 @@ Create `tooling/effectified-api-proof/package.json`:
 ```
 
 This package intentionally imports pinned APIs in isolation before the main plan
-bakes snippets into the template. Task 0 uses the repo's current Confect patch
-so the new workspace does not mix package versions before Task 2A. If Task 2A
-accepts a newer Confect patch, update this proof package together with the real
-package manifests. The proof package is part of the "all Confect packages share
-one exact patch" invariant, even though it is only a compile-only workspace.
+bakes snippets into the template. Task 2A accepted the `9.1.5` Confect patch, so
+the proof package stays pinned with the real package manifests. The proof
+package is part of the "all Confect packages share one exact patch" invariant,
+even though it is only a compile-only workspace.
 
-The proof script uses `--skipLibCheck` because Confect `9.1.4` currently
-publishes declaration barrels that trip TypeScript `NodeNext` extension
-diagnostics (`TS2835`) inside `node_modules` before the proof files are checked.
-Do not use `skipLibCheck` as a general repo default; it is scoped to this
-compile-only external API proof package.
+The proof script uses `--skipLibCheck` because Confect declaration barrels can
+trip TypeScript `NodeNext` extension diagnostics (`TS2835`) inside
+`node_modules` before the proof files are checked. Do not use `skipLibCheck` as
+a general repo default; it is scoped to this compile-only external API proof
+package.
 
 - [ ] **Step 2: Prove Confect v9 spec/impl/test imports**
 
@@ -925,7 +926,7 @@ contract family.
 
 ## Current Verified Baseline
 
-- Confect packages are pinned to `9.1.4`; Effect is pinned to `3.21.4`.
+- Confect packages are pinned to `9.1.5`; Effect is pinned to `3.21.4`.
 - Durable tables live under `packages/convex/confect/tables/*`.
 - Confect specs and impls exist for access, Brain pages, capabilities, jobs,
   ops, agents, auth, and demo surfaces.
@@ -1087,12 +1088,11 @@ rtk npm view @confect/js version
 ```
 
 Expected: each command prints the same v9 patch, or the implementation records
-why the repo remains on `9.1.4`. If the current patch is accepted, update every
-`@confect/*` package together before running codegen, including
+why the repo remains on the prior patch. If the current patch is accepted,
+update every `@confect/*` package together before running codegen, including
 `tooling/effectified-api-proof/package.json`; do not mix Confect patch versions.
 The 2026-07-03 follow-up checkpoint reported `9.1.5` for all `@confect/*`
-packages, so the default path is to bump the repo and proof package from `9.1.4`
-to `9.1.5` unless a fresh checkpoint says otherwise.
+packages, and Task 2A accepted that bump for the repo and proof package.
 
 Append this section to `docs/template/confect-effect-guide.md`:
 

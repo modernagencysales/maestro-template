@@ -41,19 +41,26 @@ export const checkDescriptors = {
         includes: [
           "OPENAI_API_KEY",
           "extract-ai-verdict.mts",
-          "pnpm taste -- --mode fake | pnpm exec tsx tooling/quality/extract-ai-verdict.mts",
+          "TASTE_REVIEW_WORKTREE",
+          "TRUSTED_TREE",
+          "pnpm exec tsx tooling/quality/taste.mts --mode fake | pnpm exec tsx tooling/quality/extract-ai-verdict.mts",
+          'pnpm exec tsx "$TRUSTED_TREE/tooling/quality/taste.mts"',
         ],
-        message: "taste AI gate must require provider auth and parse verdicts",
+        message:
+          "taste AI gate must require provider auth, run trusted reviewer code, and parse verdicts",
       },
       {
         file: ".buildkite/scripts/contract-review.sh",
         includes: [
           "OPENAI_API_KEY",
           "extract-ai-verdict.mts",
-          "pnpm contract-review -- --mode fake | pnpm exec tsx tooling/quality/extract-ai-verdict.mts",
+          "CONTRACT_REVIEW_WORKTREE",
+          "TRUSTED_TREE",
+          "pnpm exec tsx tooling/quality/contract-review.mts --mode fake | pnpm exec tsx tooling/quality/extract-ai-verdict.mts",
+          'pnpm exec tsx "$TRUSTED_TREE/tooling/quality/contract-review.mts"',
         ],
         message:
-          "contract-review AI gate must require provider auth and parse verdicts",
+          "contract-review AI gate must require provider auth, run trusted reviewer code, and parse verdicts",
       },
       {
         file: "docs/template/operations-runbook.md",
