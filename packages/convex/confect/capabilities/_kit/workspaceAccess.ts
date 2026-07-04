@@ -3,7 +3,13 @@ import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import { resolveEffectiveWorkspaceRole } from "../../access/auth";
+import {
+  resolveEffectiveWorkspaceRole,
+  type OrganizationMemberRef,
+  type OrganizationRef,
+  type WorkspaceMemberRef,
+  type WorkspaceRef,
+} from "../../access/auth";
 import { roleAtLeast, type Role } from "../../access/roles";
 import { Auth, DatabaseReader } from "../../_generated/services";
 import {
@@ -28,92 +34,28 @@ export const requireWorkspaceAccess = (
   Auth | DatabaseReader | Clock.Clock
 > =>
   Effect.gen(function* () {
-    const auth = yield* Auth;
-    const reader = yield* DatabaseReader;
-    const identity = yield* auth.getUserIdentity.pipe(
-      Effect.mapError(() => new Unauthorized()),
+    const user = yield* loadActiveWorkspaceUser;
+    const workspace = yield* loadWorkspace(workspaceId);
+    const organization = yield* loadWorkspaceOrganization(
+      workspace.organizationId,
+      workspaceId,
     );
-
-    const user = yield* reader
-      .table("users")
-      .index("by_subject", (q) => q.eq("subject", identity.subject))
-      .first()
-      .pipe(Effect.map(Option.getOrNull), Effect.orDie);
-    if (user === null || user.status !== "active") {
-      return yield* Effect.fail(new Unauthorized());
-    }
-
-    const workspace = yield* reader
-      .table("workspaces")
-      .get(workspaceId)
-      .pipe(Effect.orDie);
-    if (workspace === null) {
-      return yield* Effect.fail(new WorkspaceNotFound({ workspaceId }));
-    }
-
-    const organizationId = toId<"organizations">(workspace.organizationId);
-    const organization = yield* reader
-      .table("organizations")
-      .get(organizationId)
-      .pipe(Effect.orDie);
-    if (organization === null) {
-      return yield* Effect.fail(new WorkspaceNotFound({ workspaceId }));
-    }
-
     const nowMs = yield* Clock.currentTimeMillis;
-    const workspaceMembers = yield* reader
-      .table("workspaceMembers")
-      .index("by_workspace_user", (q) =>
-        q.eq("workspaceId", workspaceId).eq("userId", user._id),
-      )
-      .collect()
-      .pipe(Effect.orDie);
-    const organizationMembers = yield* reader
-      .table("organizationMembers")
-      .index("by_organization_user", (q) =>
-        q.eq("organizationId", workspace.organizationId).eq("userId", user._id),
-      )
-      .collect()
-      .pipe(Effect.orDie);
-    const resolution = resolveEffectiveWorkspaceRole({
-      nowMs,
+    const memberships = yield* loadWorkspaceAccessMemberships({
+      workspaceId,
+      organizationId: workspace.organizationId,
       userId: user._id,
-      workspace: {
-        id: workspace._id,
-        organizationId: workspace.organizationId,
-        status: workspace.status,
-      },
-      organization: {
-        id: organization._id,
-        status: organization.status,
-      },
-      workspaceMembers: workspaceMembers.map((member) => ({
-        workspaceId: member.workspaceId,
-        userId: member.userId,
-        role: member.role,
-        status: member.status,
-        acceptedAt: member.acceptedAt,
-        revokedAt: member.revokedAt,
-        deletedAt: member.deletedAt,
-      })),
-      organizationMembers: organizationMembers.map((member) => ({
-        organizationId: member.organizationId,
-        userId: member.userId,
-        role: member.role,
-        status: member.status,
-        acceptedAt: member.acceptedAt,
-        revokedAt: member.revokedAt,
-      })),
-      guestGrants: [],
     });
-
-    if (!resolution.ok || !roleAtLeast(resolution.role, minimumRole)) {
-      return yield* Effect.fail(
-        new MemberNotInWorkspace({
-          membershipId: "actor",
-        }),
-      );
-    }
+    const resolution = yield* requireResolvedWorkspaceAccess(
+      resolveWorkspaceAccessRole({
+        nowMs,
+        userId: user._id,
+        workspace,
+        organization,
+        ...memberships,
+      }),
+      minimumRole,
+    );
 
     return {
       userId: user._id,
@@ -122,6 +64,142 @@ export const requireWorkspaceAccess = (
       reason: resolution.reason,
     };
   });
+
+const loadActiveWorkspaceUser = Effect.gen(function* () {
+  const auth = yield* Auth;
+  const reader = yield* DatabaseReader;
+  const identity = yield* auth.getUserIdentity.pipe(
+    Effect.mapError(() => new Unauthorized()),
+  );
+  const user = yield* reader
+    .table("users")
+    .index("by_subject", (q) => q.eq("subject", identity.subject))
+    .first()
+    .pipe(Effect.map(Option.getOrNull), Effect.orDie);
+
+  return yield* requireActiveUser(user);
+});
+
+const requireActiveUser = <User extends { readonly status: string }>(
+  user: User | null,
+) =>
+  user === null || user.status !== "active"
+    ? Effect.fail(new Unauthorized())
+    : Effect.succeed(user);
+
+const loadWorkspace = (workspaceId: GenericId<"workspaces">) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const workspace = yield* reader
+      .table("workspaces")
+      .get(workspaceId)
+      .pipe(Effect.orDie);
+
+    return yield* requireWorkspaceRow(workspace, workspaceId);
+  });
+
+const loadWorkspaceOrganization = (
+  organizationId: string,
+  workspaceId: GenericId<"workspaces">,
+) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const organization = yield* reader
+      .table("organizations")
+      .get(toId<"organizations">(organizationId))
+      .pipe(Effect.orDie);
+
+    return yield* requireWorkspaceRow(organization, workspaceId);
+  });
+
+const requireWorkspaceRow = <Row>(
+  row: Row | null,
+  workspaceId: GenericId<"workspaces">,
+) =>
+  row === null
+    ? Effect.fail(new WorkspaceNotFound({ workspaceId }))
+    : Effect.succeed(row);
+
+const loadWorkspaceAccessMemberships = (input: {
+  readonly workspaceId: GenericId<"workspaces">;
+  readonly organizationId: string;
+  readonly userId: GenericId<"users">;
+}) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const workspaceMembers = yield* reader
+      .table("workspaceMembers")
+      .index("by_workspace_user", (q) =>
+        q.eq("workspaceId", input.workspaceId).eq("userId", input.userId),
+      )
+      .collect()
+      .pipe(Effect.orDie);
+    const organizationMembers = yield* reader
+      .table("organizationMembers")
+      .index("by_organization_user", (q) =>
+        q.eq("organizationId", input.organizationId).eq("userId", input.userId),
+      )
+      .collect()
+      .pipe(Effect.orDie);
+
+    return { workspaceMembers, organizationMembers };
+  });
+
+const resolveWorkspaceAccessRole = (input: {
+  readonly nowMs: number;
+  readonly userId: GenericId<"users">;
+  readonly workspace: Omit<WorkspaceRef, "id"> & {
+    readonly _id: GenericId<"workspaces">;
+  };
+  readonly organization: Omit<OrganizationRef, "id"> & {
+    readonly _id: GenericId<"organizations">;
+  };
+  readonly workspaceMembers: readonly WorkspaceMemberRef[];
+  readonly organizationMembers: readonly OrganizationMemberRef[];
+}) =>
+  resolveEffectiveWorkspaceRole({
+    nowMs: input.nowMs,
+    userId: input.userId,
+    workspace: {
+      id: input.workspace._id,
+      organizationId: input.workspace.organizationId,
+      status: input.workspace.status,
+    },
+    organization: {
+      id: input.organization._id,
+      status: input.organization.status,
+    },
+    workspaceMembers: input.workspaceMembers.map((member) => ({
+      workspaceId: member.workspaceId,
+      userId: member.userId,
+      role: member.role,
+      status: member.status,
+      acceptedAt: member.acceptedAt,
+      revokedAt: member.revokedAt,
+      deletedAt: member.deletedAt,
+    })),
+    organizationMembers: input.organizationMembers.map((member) => ({
+      organizationId: member.organizationId,
+      userId: member.userId,
+      role: member.role,
+      status: member.status,
+      acceptedAt: member.acceptedAt,
+      revokedAt: member.revokedAt,
+    })),
+    guestGrants: [],
+  });
+
+const requireResolvedWorkspaceAccess = (
+  resolution: ReturnType<typeof resolveEffectiveWorkspaceRole>,
+  minimumRole: Role,
+) =>
+  resolution.ok && roleAtLeast(resolution.role, minimumRole)
+    ? Effect.succeed(resolution)
+    : Effect.fail(
+        new MemberNotInWorkspace({
+          membershipId: "actor",
+        }),
+      );
 
 const toId = <TableName extends string>(id: string): GenericId<TableName> =>
   id as GenericId<TableName>;

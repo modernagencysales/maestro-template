@@ -3,13 +3,23 @@ import type { FunctionReference } from "convex/server";
 import { makePublicError } from "../../shared/errors";
 import { runObservedWorkflowStage } from "./observedStage";
 import {
-  evaluateSafeConditionExpression,
   validateWorkflowGraph,
   type DurableWorkflowGraph,
-  type WorkflowEdge,
-  type WorkflowJoin,
   type WorkflowNode,
 } from "../graph";
+import { assertJsonObject, assertJsonSafe } from "./graphRunnerJson";
+import {
+  executeNode,
+  isEdgeActive,
+  preflightCapabilityRegistry,
+} from "./graphRunnerNodes";
+import {
+  buildEdgeIndexes,
+  findBlockedReachableNodeIds,
+  findReachableNodeIds,
+  isNodeReady,
+  type TraversalSnapshot,
+} from "./graphRunnerTraversal";
 
 export type DurableGraphStepKind = "query" | "mutation" | "action";
 
@@ -78,541 +88,250 @@ export type RunDurableGraphStep = {
   }) => Promise<Result>;
 };
 
+type GraphExecutionState = Omit<
+  TraversalSnapshot,
+  "completedNodes" | "passedEdges" | "failedEdges"
+> & {
+  readonly input: RunDurableGraphInput;
+  readonly nodesById: ReadonlyMap<string, WorkflowNode>;
+  readonly outgoingByNode: ReadonlyMap<string, readonly WorkflowNodeEdge[]>;
+  readonly reachableNodeIds: ReadonlySet<string>;
+  readonly context: Record<string, unknown>;
+  readonly completedNodes: Set<string>;
+  readonly passedEdges: Set<string>;
+  readonly failedEdges: Set<string>;
+  readonly queuedNodes: Set<string>;
+  readonly queue: string[];
+  order: number;
+};
+
+type WorkflowNodeEdge = DurableWorkflowGraph["edges"][number];
+
+type ProcessNodeOutcome =
+  | { readonly type: "continue" }
+  | {
+      readonly type: "output";
+      readonly value: Readonly<Record<string, unknown>>;
+    };
+
 export const runDurableGraphWorkflow = async (
   step: RunDurableGraphStep,
   input: RunDurableGraphInput,
 ): Promise<Readonly<Record<string, unknown>>> => {
-  const validationErrors = validateWorkflowGraph(input.graph);
-  if (validationErrors.length > 0) {
-    throw makePublicError("VALIDATION_FAILED", "Workflow graph is invalid.", {
-      errorCount: validationErrors.length,
-    });
+  validateGraphOrThrow(input.graph);
+  const startNode = readStartNode(input.graph);
+  preflightCapabilityRegistry(input.graph, input.capabilityRegistry);
+  const state = createExecutionState(input, startNode);
+
+  while (state.queue.length > 0) {
+    const outcome = await processNextQueuedNode(step, state);
+    if (outcome.type === "output") {
+      return outcome.value;
+    }
   }
 
-  const nodesById = new Map(input.graph.nodes.map((node) => [node.id, node]));
-  const startNode = nodesById.get(input.graph.startNodeId);
+  assertNoBlockedReachableNodes(state);
+  assertJsonSafe(state.context, "Workflow context must be JSON-safe.");
+  return state.context;
+};
+
+const validateGraphOrThrow = (graph: DurableWorkflowGraph): void => {
+  const validationErrors = validateWorkflowGraph(graph);
+  if (validationErrors.length === 0) {
+    return;
+  }
+  throw makePublicError("VALIDATION_FAILED", "Workflow graph is invalid.", {
+    errorCount: validationErrors.length,
+  });
+};
+
+const readStartNode = (graph: DurableWorkflowGraph): WorkflowNode => {
+  const startNode = graph.nodes.find((node) => node.id === graph.startNodeId);
   if (!startNode) {
     throw makePublicError("VALIDATION_FAILED", "Workflow graph is invalid.");
   }
+  return startNode;
+};
 
-  preflightCapabilityRegistry(input.graph, input.capabilityRegistry);
+const createExecutionState = (
+  input: RunDurableGraphInput,
+  startNode: WorkflowNode,
+): GraphExecutionState => {
+  const edgeIndexes = buildEdgeIndexes(input.graph.edges);
+  const outgoingByNode = edgeIndexes.outgoingByNode;
 
-  const incomingByNode = groupEdgesByTarget(input.graph.edges);
-  const outgoingByNode = groupEdgesBySource(input.graph.edges);
-  const reachableNodeIds = findReachableNodeIds(startNode.id, outgoingByNode);
-  const joinsByNode = new Map(
-    input.graph.joins.map((join) => [join.nodeId, join]),
-  );
-  const context: Record<string, unknown> = {};
-  const completedNodes = new Set<string>();
-  const passedEdges = new Set<string>();
-  const failedEdges = new Set<string>();
-  const queuedNodes = new Set<string>([startNode.id]);
-  const queue: string[] = [startNode.id];
-  let order = 0;
+  return {
+    input,
+    nodesById: new Map(input.graph.nodes.map((node) => [node.id, node])),
+    incomingByNode: edgeIndexes.incomingByNode,
+    outgoingByNode,
+    reachableNodeIds: findReachableNodeIds(startNode.id, outgoingByNode),
+    joinsByNode: new Map(input.graph.joins.map((join) => [join.nodeId, join])),
+    context: {},
+    completedNodes: new Set<string>(),
+    passedEdges: new Set<string>(),
+    failedEdges: new Set<string>(),
+    queuedNodes: new Set<string>([startNode.id]),
+    queue: [startNode.id],
+    order: 0,
+  };
+};
 
-  while (queue.length > 0) {
-    const nodeId = queue.shift();
-    if (!nodeId || completedNodes.has(nodeId)) {
-      continue;
-    }
-    queuedNodes.delete(nodeId);
-    const node = nodesById.get(nodeId);
-    if (!node) {
-      continue;
-    }
-
-    const result = await runObservedWorkflowStage({
-      step,
-      ...(input.observability
-        ? {
-            refs: input.observability,
-            ...(input.observability.workflowRunId
-              ? { workflowRunId: input.observability.workflowRunId }
-              : {}),
-            ...(input.observability.componentWorkflowId
-              ? { componentWorkflowId: input.observability.componentWorkflowId }
-              : {}),
-          }
-        : {}),
-      nodeId: node.id,
-      label: node.label,
-      kind: node.kind,
-      stageKey: node.id,
-      attemptNumber: 1,
-      order,
-      run: async () => {
-        const result = await executeNode(step, input, node, context);
-        assertJsonSafe(
-          result,
-          `Workflow node ${node.id} returned non-JSON output.`,
-        );
-        if (node.kind === "output") {
-          assertJsonObject(result, "Workflow output must be a JSON object.");
-        }
-        return result;
-      },
-    });
-    order += 1;
-
-    context[node.id] = result;
-    completedNodes.add(node.id);
-
-    if (node.kind === "output") {
-      assertJsonObject(result, "Workflow output must be a JSON object.");
-      return result as Readonly<Record<string, unknown>>;
-    }
-
-    for (const edge of outgoingByNode.get(node.id) ?? []) {
-      const isActive = isEdgeActive(edge, input, context);
-      if (isActive) {
-        passedEdges.add(edge.id);
-      } else {
-        failedEdges.add(edge.id);
-      }
-
-      const target = nodesById.get(edge.targetNodeId);
-      if (
-        target &&
-        isActive &&
-        !completedNodes.has(target.id) &&
-        !queuedNodes.has(target.id) &&
-        isNodeReady(
-          target,
-          incomingByNode,
-          joinsByNode,
-          completedNodes,
-          passedEdges,
-          failedEdges,
-        )
-      ) {
-        queuedNodes.add(target.id);
-        queue.push(target.id);
-      }
-    }
+const processNextQueuedNode = async (
+  step: RunDurableGraphStep,
+  state: GraphExecutionState,
+): Promise<ProcessNodeOutcome> => {
+  const node = dequeueNode(state);
+  if (!node) {
+    return { type: "continue" };
   }
 
-  const blockedReachableNodeIds = findBlockedReachableNodeIds({
-    reachableNodeIds,
-    incomingByNode,
-    joinsByNode,
-    completedNodes,
-    passedEdges,
-    failedEdges,
+  const result = await runGraphNode(step, state, node);
+  recordNodeResult(state, node, result);
+  return node.kind === "output"
+    ? outputNodeResult(result)
+    : continueAfterEnqueue(state, node);
+};
+
+const dequeueNode = (state: GraphExecutionState): WorkflowNode | undefined => {
+  const nodeId = state.queue.shift();
+  if (!nodeId || state.completedNodes.has(nodeId)) {
+    return undefined;
+  }
+  state.queuedNodes.delete(nodeId);
+  return state.nodesById.get(nodeId);
+};
+
+const runGraphNode = (
+  step: RunDurableGraphStep,
+  state: GraphExecutionState,
+  node: WorkflowNode,
+): Promise<unknown> =>
+  runObservedWorkflowStage({
+    step,
+    ...observabilityArgs(state.input),
+    nodeId: node.id,
+    label: node.label,
+    kind: node.kind,
+    stageKey: node.id,
+    attemptNumber: 1,
+    order: state.order,
+    run: () => executeAndValidateNode(step, state, node),
   });
-  if (blockedReachableNodeIds.length > 0) {
-    throw makePublicError(
-      "VALIDATION_FAILED",
-      "Workflow graph traversal made no progress before completing reachable nodes.",
-      { nodeIds: blockedReachableNodeIds.join(",") },
-    );
-  }
 
-  assertJsonSafe(context, "Workflow context must be JSON-safe.");
-  return context;
+const observabilityArgs = (
+  input: RunDurableGraphInput,
+): Partial<Parameters<typeof runObservedWorkflowStage>[0]> => {
+  const refs = input.observability;
+  return refs
+    ? {
+        refs,
+        ...(refs.workflowRunId ? { workflowRunId: refs.workflowRunId } : {}),
+        ...(refs.componentWorkflowId
+          ? { componentWorkflowId: refs.componentWorkflowId }
+          : {}),
+      }
+    : {};
 };
 
-const executeNode = async (
+const executeAndValidateNode = async (
   step: RunDurableGraphStep,
-  input: RunDurableGraphInput,
+  state: GraphExecutionState,
   node: WorkflowNode,
-  context: Readonly<Record<string, unknown>>,
 ): Promise<unknown> => {
-  switch (node.kind) {
-    case "source":
-      return input.inputs;
-    case "capability":
-      return dispatchCapability(step, input, node, context, false);
-    case "agent":
-      return dispatchCapability(step, input, node, context, true);
-    case "delay": {
-      const delayMs = node.delayMs ?? 0;
-      await step.sleep(delayMs, { name: `${input.graph.id}.${node.id}.delay` });
-      return { delayedMs: delayMs };
-    }
-    case "approval":
-      return step.awaitEvent({
-        name: `${input.graph.id}.${node.id}.approved`,
-      });
-    case "output": {
-      const envelope = buildEnvelope(input, node, context);
-      const projected =
-        input.projectOutput?.(envelope) ??
-        ({
-          inputs: input.inputs,
-          context,
-          policySnapshot: input.policySnapshot,
-        } satisfies Record<string, unknown>);
-      assertJsonObject(projected, "Workflow output must be a JSON object.");
-      return projected;
-    }
-    default:
-      throw makePublicError(
-        "VALIDATION_FAILED",
-        `Unsupported workflow node kind: ${(node as { kind?: string }).kind}`,
-      );
+  const result = await executeNode({
+    step,
+    input: state.input,
+    node,
+    context: state.context,
+  });
+  assertJsonSafe(result, `Workflow node ${node.id} returned non-JSON output.`);
+  if (node.kind === "output") {
+    assertJsonObject(result, "Workflow output must be a JSON object.");
   }
+  return result;
 };
 
-const dispatchCapability = async (
-  step: RunDurableGraphStep,
-  input: RunDurableGraphInput,
+const recordNodeResult = (
+  state: GraphExecutionState,
   node: WorkflowNode,
-  context: Readonly<Record<string, unknown>>,
-  agentOnly: boolean,
-): Promise<unknown> => {
-  const capabilityKey = agentOnly
-    ? (node.agent ?? node.capability)
-    : node.capability;
-  if (!capabilityKey) {
-    throw makePublicError(
-      "VALIDATION_FAILED",
-      `${agentOnly ? "Agent" : "Capability"} node is missing a capability ref.`,
-      { nodeId: node.id },
-    );
-  }
-
-  const entry = input.capabilityRegistry[capabilityKey];
-  if (!entry) {
-    throw makePublicError(
-      "VALIDATION_FAILED",
-      `Missing workflow capability ref: ${capabilityKey}`,
-      { nodeId: node.id },
-    );
-  }
-
-  if (agentOnly && entry.agentSeat !== true) {
-    throw makePublicError(
-      "VALIDATION_FAILED",
-      `Agent node is not tagged as an agent seat: ${capabilityKey}`,
-      { nodeId: node.id },
-    );
-  }
-
-  const envelope = buildEnvelope(input, node, context);
-  const args = entry.buildArgs?.(envelope) ?? envelope;
-
-  switch (entry.kind) {
-    case "action":
-      return step.runAction(entry.ref as DurableGraphStepRef<"action">, args);
-    case "mutation":
-      return step.runMutation(
-        entry.ref as DurableGraphStepRef<"mutation">,
-        args,
-      );
-    case "query":
-      return step.runQuery(entry.ref as DurableGraphStepRef<"query">, args);
-  }
-};
-
-const buildEnvelope = (
-  input: RunDurableGraphInput,
-  node: WorkflowNode,
-  context: Readonly<Record<string, unknown>>,
-): DurableGraphCapabilityEnvelope => ({
-  inputs: input.inputs,
-  context,
-  node,
-  policySnapshot: input.policySnapshot,
-});
-
-const preflightCapabilityRegistry = (
-  graph: DurableWorkflowGraph,
-  registry: Readonly<Record<string, DurableGraphCapabilityEntry>>,
+  result: unknown,
 ): void => {
-  for (const node of graph.nodes) {
-    if (node.kind !== "capability" && node.kind !== "agent") {
-      continue;
-    }
-
-    const key =
-      node.kind === "agent" ? (node.agent ?? node.capability) : node.capability;
-    if (!key || !registry[key]) {
-      throw makePublicError(
-        "VALIDATION_FAILED",
-        `Missing workflow capability ref: ${key ?? ""}`,
-        { nodeId: node.id },
-      );
-    }
-
-    if (node.kind === "agent" && registry[key]?.agentSeat !== true) {
-      throw makePublicError(
-        "VALIDATION_FAILED",
-        `Agent node is not tagged as an agent seat: ${key}`,
-        { nodeId: node.id },
-      );
-    }
-  }
+  state.order += 1;
+  state.context[node.id] = result;
+  state.completedNodes.add(node.id);
 };
 
-const isEdgeActive = (
-  edge: WorkflowEdge,
-  input: RunDurableGraphInput,
-  context: Readonly<Record<string, unknown>>,
-): boolean =>
-  edge.condition
-    ? evaluateSafeConditionExpression(edge.condition.expression, {
-        inputs: input.inputs,
-        context,
-        policySnapshot: input.policySnapshot,
-      })
-    : true;
+const outputNodeResult = (result: unknown): ProcessNodeOutcome => {
+  assertJsonObject(result, "Workflow output must be a JSON object.");
+  return { type: "output", value: result as Readonly<Record<string, unknown>> };
+};
 
-const isNodeReady = (
+const continueAfterEnqueue = (
+  state: GraphExecutionState,
   node: WorkflowNode,
-  incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>,
-  joinsByNode: ReadonlyMap<string, WorkflowJoin>,
-  completedNodes: ReadonlySet<string>,
-  passedEdges: ReadonlySet<string>,
-  failedEdges: ReadonlySet<string>,
+): ProcessNodeOutcome => {
+  enqueueActiveTargets(state, node);
+  return { type: "continue" };
+};
+
+const enqueueActiveTargets = (
+  state: GraphExecutionState,
+  node: WorkflowNode,
+): void => {
+  for (const edge of state.outgoingByNode.get(node.id) ?? []) {
+    const active = recordEdgeState(state, edge);
+    enqueueTargetIfReady(state, edge, active);
+  }
+};
+
+const recordEdgeState = (
+  state: GraphExecutionState,
+  edge: WorkflowNodeEdge,
 ): boolean => {
-  const incoming = incomingByNode.get(node.id) ?? [];
-  const join = joinsByNode.get(node.id);
-  const skippedNodes = createSkippedNodeResolver({
-    incomingByNode,
-    joinsByNode,
-    completedNodes,
-    passedEdges,
-    failedEdges,
+  const active = isEdgeActive({
+    edge,
+    input: state.input,
+    context: state.context,
   });
-
-  if (join?.strategy === "all-successful") {
-    return join.sourceNodeIds.every((sourceNodeId) =>
-      incoming.some(
-        (edge) =>
-          edge.sourceNodeId === sourceNodeId && passedEdges.has(edge.id),
-      ),
-    );
-  }
-
-  if (join?.strategy === "any-successful") {
-    return join.sourceNodeIds.some((sourceNodeId) =>
-      incoming.some(
-        (edge) =>
-          edge.sourceNodeId === sourceNodeId && passedEdges.has(edge.id),
-      ),
-    );
-  }
-
-  return (
-    incoming.length === 0 ||
-    (incoming.some((edge) => passedEdges.has(edge.id)) &&
-      incoming.every(
-        (edge) =>
-          passedEdges.has(edge.id) ||
-          failedEdges.has(edge.id) ||
-          skippedNodes.isNodeSkipped(edge.sourceNodeId),
-      ))
-  );
+  (active ? state.passedEdges : state.failedEdges).add(edge.id);
+  return active;
 };
 
-const createSkippedNodeResolver = ({
-  incomingByNode,
-  joinsByNode,
-  completedNodes,
-  passedEdges,
-  failedEdges,
-}: {
-  readonly incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>;
-  readonly joinsByNode: ReadonlyMap<string, WorkflowJoin>;
-  readonly completedNodes: ReadonlySet<string>;
-  readonly passedEdges: ReadonlySet<string>;
-  readonly failedEdges: ReadonlySet<string>;
-}): { readonly isNodeSkipped: (nodeId: string) => boolean } => {
-  const skippedNodeResults = new Map<string, boolean>();
-  const visitingNodeIds = new Set<string>();
-
-  function isEdgeUnavailable(edge: WorkflowEdge): boolean {
-    return failedEdges.has(edge.id) || isNodeSkipped(edge.sourceNodeId);
+const enqueueTargetIfReady = (
+  state: GraphExecutionState,
+  edge: WorkflowNodeEdge,
+  active: boolean,
+): void => {
+  if (!active) {
+    return;
   }
-
-  function sourceHasPassedEdge(
-    sourceNodeId: string,
-    edges: readonly WorkflowEdge[],
-  ): boolean {
-    return edges.some(
-      (edge) => edge.sourceNodeId === sourceNodeId && passedEdges.has(edge.id),
-    );
+  const target = state.nodesById.get(edge.targetNodeId);
+  if (target && shouldQueueTarget(state, target)) {
+    state.queuedNodes.add(target.id);
+    state.queue.push(target.id);
   }
-
-  function sourceEdgesAreUnavailable(
-    sourceNodeId: string,
-    edges: readonly WorkflowEdge[],
-  ): boolean {
-    const sourceEdges = edges.filter(
-      (edge) => edge.sourceNodeId === sourceNodeId,
-    );
-    return sourceEdges.length > 0 && sourceEdges.every(isEdgeUnavailable);
-  }
-
-  function isNodeSkipped(nodeId: string): boolean {
-    if (completedNodes.has(nodeId)) {
-      return false;
-    }
-    const memoized = skippedNodeResults.get(nodeId);
-    if (memoized !== undefined) {
-      return memoized;
-    }
-    if (visitingNodeIds.has(nodeId)) {
-      return false;
-    }
-
-    visitingNodeIds.add(nodeId);
-    const incoming = incomingByNode.get(nodeId) ?? [];
-    const join = joinsByNode.get(nodeId);
-    let skipped = false;
-
-    if (incoming.length > 0) {
-      if (join?.strategy === "all-successful") {
-        const everyJoinSourceResolved = join.sourceNodeIds.every(
-          (sourceNodeId) =>
-            sourceHasPassedEdge(sourceNodeId, incoming) ||
-            sourceEdgesAreUnavailable(sourceNodeId, incoming),
-        );
-        const everyJoinSourcePassed = join.sourceNodeIds.every((sourceNodeId) =>
-          sourceHasPassedEdge(sourceNodeId, incoming),
-        );
-        skipped = everyJoinSourceResolved && !everyJoinSourcePassed;
-      } else if (join?.strategy === "any-successful") {
-        const anyJoinSourcePassed = join.sourceNodeIds.some((sourceNodeId) =>
-          sourceHasPassedEdge(sourceNodeId, incoming),
-        );
-        skipped =
-          !anyJoinSourcePassed &&
-          join.sourceNodeIds.every((sourceNodeId) =>
-            sourceEdgesAreUnavailable(sourceNodeId, incoming),
-          );
-      } else {
-        skipped =
-          !incoming.some((edge) => passedEdges.has(edge.id)) &&
-          incoming.every(isEdgeUnavailable);
-      }
-    }
-
-    visitingNodeIds.delete(nodeId);
-    skippedNodeResults.set(nodeId, skipped);
-    return skipped;
-  }
-
-  return { isNodeSkipped };
 };
 
-const findBlockedReachableNodeIds = ({
-  reachableNodeIds,
-  incomingByNode,
-  joinsByNode,
-  completedNodes,
-  passedEdges,
-  failedEdges,
-}: {
-  readonly reachableNodeIds: ReadonlySet<string>;
-  readonly incomingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>;
-  readonly joinsByNode: ReadonlyMap<string, WorkflowJoin>;
-  readonly completedNodes: ReadonlySet<string>;
-  readonly passedEdges: ReadonlySet<string>;
-  readonly failedEdges: ReadonlySet<string>;
-}): readonly string[] => {
-  const skippedNodes = createSkippedNodeResolver({
-    incomingByNode,
-    joinsByNode,
-    completedNodes,
-    passedEdges,
-    failedEdges,
+const shouldQueueTarget = (
+  state: GraphExecutionState,
+  target: WorkflowNode,
+): boolean =>
+  !state.completedNodes.has(target.id) &&
+  !state.queuedNodes.has(target.id) &&
+  isNodeReady(target, state);
+
+const assertNoBlockedReachableNodes = (state: GraphExecutionState): void => {
+  const blockedReachableNodeIds = findBlockedReachableNodeIds({
+    reachableNodeIds: state.reachableNodeIds,
+    snapshot: state,
   });
-
-  return [...reachableNodeIds].filter(
-    (nodeId) =>
-      !completedNodes.has(nodeId) && !skippedNodes.isNodeSkipped(nodeId),
+  if (blockedReachableNodeIds.length === 0) {
+    return;
+  }
+  throw makePublicError(
+    "VALIDATION_FAILED",
+    "Workflow graph traversal made no progress before completing reachable nodes.",
+    { nodeIds: blockedReachableNodeIds.join(",") },
   );
-};
-
-const groupEdgesBySource = (
-  edges: readonly WorkflowEdge[],
-): ReadonlyMap<string, readonly WorkflowEdge[]> => {
-  const grouped = new Map<string, WorkflowEdge[]>();
-  for (const edge of edges) {
-    grouped.set(edge.sourceNodeId, [
-      ...(grouped.get(edge.sourceNodeId) ?? []),
-      edge,
-    ]);
-  }
-  return grouped;
-};
-
-const findReachableNodeIds = (
-  startNodeId: string,
-  outgoingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>,
-): ReadonlySet<string> => {
-  const reachable = new Set<string>();
-  const queue = [startNodeId];
-
-  while (queue.length > 0) {
-    const nodeId = queue.shift();
-    if (!nodeId || reachable.has(nodeId)) {
-      continue;
-    }
-    reachable.add(nodeId);
-
-    for (const edge of outgoingByNode.get(nodeId) ?? []) {
-      if (!reachable.has(edge.targetNodeId)) {
-        queue.push(edge.targetNodeId);
-      }
-    }
-  }
-
-  return reachable;
-};
-
-const groupEdgesByTarget = (
-  edges: readonly WorkflowEdge[],
-): ReadonlyMap<string, readonly WorkflowEdge[]> => {
-  const grouped = new Map<string, WorkflowEdge[]>();
-  for (const edge of edges) {
-    grouped.set(edge.targetNodeId, [
-      ...(grouped.get(edge.targetNodeId) ?? []),
-      edge,
-    ]);
-  }
-  return grouped;
-};
-
-const assertJsonObject = (value: unknown, message: string): void => {
-  if (!isJsonRecord(value)) {
-    throw makePublicError("VALIDATION_FAILED", message);
-  }
-  assertJsonSafe(value, message);
-};
-
-const assertJsonSafe = (value: unknown, message: string): void => {
-  if (!isJsonSafe(value)) {
-    throw makePublicError("VALIDATION_FAILED", message);
-  }
-};
-
-const isJsonRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null &&
-  typeof value === "object" &&
-  !Array.isArray(value) &&
-  Object.getPrototypeOf(value) === Object.prototype;
-
-const isJsonSafe = (value: unknown): boolean => {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
-  ) {
-    return true;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value);
-  }
-  if (Array.isArray(value)) {
-    return value.every(isJsonSafe);
-  }
-  if (isJsonRecord(value)) {
-    return Object.values(value).every(
-      (entry) => entry !== undefined && isJsonSafe(entry),
-    );
-  }
-  return false;
 };

@@ -49,67 +49,88 @@ const isKnownComponentStatus = (
 export const projectWorkflowStatus = (
   value: WorkflowStatus | null | undefined,
   run?: WorkflowStatusRunProjection | null,
+): WorkflowStatusResult =>
+  isTimedOutRun(run)
+    ? projectTimedOutWorkflowStatus(value, run)
+    : projectLiveWorkflowStatus(value, run);
+
+const isTimedOutRun = (
+  run: WorkflowStatusRunProjection | null | undefined,
+): run is WorkflowStatusRunProjection =>
+  run?.status === "timedOut" || run?.timedOutAt != null;
+
+const projectTimedOutWorkflowStatus = (
+  value: WorkflowStatus | null | undefined,
+  run: WorkflowStatusRunProjection,
+): WorkflowStatusResult => ({
+  status: "timedOut",
+  ...componentStatusFields(value as ComponentWorkflowStatusBlob | null),
+  timeout: {
+    deadlineAt: run.deadlineAt,
+    timedOutAt: run.timedOutAt,
+    errorCode: run.timeoutErrorCode,
+    summary: run.timeoutSummary,
+  },
+});
+
+const projectLiveWorkflowStatus = (
+  value: WorkflowStatus | null | undefined,
+  run?: WorkflowStatusRunProjection | null,
 ): WorkflowStatusResult => {
-  const component = value as ComponentWorkflowStatusBlob | null | undefined;
-  const componentStatus = component?.type;
-
-  if (run?.status === "timedOut" || run?.timedOutAt != null) {
-    return {
-      status: "timedOut",
-      ...(isKnownComponentStatus(componentStatus) ? { componentStatus } : {}),
-      ...(componentStatus === "completed" ? { result: component?.result } : {}),
-      ...(componentStatus === "failed" && typeof component?.error === "string"
-        ? { error: component.error }
-        : {}),
-      ...(componentStatus === "inProgress" && Array.isArray(component?.running)
-        ? { running: component.running }
-        : {}),
-      timeout: {
-        deadlineAt: run.deadlineAt,
-        timedOutAt: run.timedOutAt,
-        errorCode: run.timeoutErrorCode,
-        summary: run.timeoutSummary,
-      },
-    };
-  }
-
   if (!value) {
     return { status: run?.status ?? "queued" };
   }
+  return projectComponentWorkflowStatus(
+    value as ComponentWorkflowStatusBlob,
+    run,
+  );
+};
 
-  const presentComponent = value as ComponentWorkflowStatusBlob;
-  const presentComponentStatus = presentComponent.type;
+const projectComponentWorkflowStatus = (
+  component: ComponentWorkflowStatusBlob,
+  run?: WorkflowStatusRunProjection | null,
+): WorkflowStatusResult => {
+  const projections: Readonly<Record<string, () => WorkflowStatusResult>> = {
+    inProgress: () => ({
+      status: run?.status === "queued" ? "queued" : "running",
+      componentStatus: "inProgress",
+      running: Array.isArray(component.running) ? component.running : [],
+    }),
+    completed: () => ({
+      status: "completed",
+      componentStatus: "completed",
+      result: component.result,
+    }),
+    failed: () => ({
+      status: "failed",
+      componentStatus: "failed",
+      error: typeof component.error === "string" ? component.error : "",
+    }),
+    canceled: () => ({
+      status: "canceled",
+      componentStatus: "canceled",
+    }),
+  };
 
-  switch (presentComponentStatus) {
-    case "inProgress":
-      return {
-        status: run?.status === "queued" ? "queued" : "running",
-        componentStatus: presentComponentStatus,
-        running: Array.isArray(presentComponent.running)
-          ? presentComponent.running
-          : [],
-      };
-    case "completed":
-      return {
-        status: "completed",
-        componentStatus: presentComponentStatus,
-        result: presentComponent.result,
-      };
-    case "failed":
-      return {
-        status: "failed",
-        componentStatus: presentComponentStatus,
-        error:
-          typeof presentComponent.error === "string"
-            ? presentComponent.error
-            : "",
-      };
-    case "canceled":
-      return {
-        status: "canceled",
-        componentStatus: presentComponentStatus,
-      };
-    default:
-      return { status: run?.status ?? "queued" };
-  }
+  return (
+    projections[String(component.type)]?.() ?? {
+      status: run?.status ?? "queued",
+    }
+  );
+};
+
+const componentStatusFields = (
+  component: ComponentWorkflowStatusBlob | null | undefined,
+): Partial<WorkflowStatusResult> => {
+  const status = component?.type;
+  return {
+    ...(isKnownComponentStatus(status) ? { componentStatus: status } : {}),
+    ...(status === "completed" ? { result: component?.result } : {}),
+    ...(status === "failed" && typeof component?.error === "string"
+      ? { error: component.error }
+      : {}),
+    ...(status === "inProgress" && Array.isArray(component?.running)
+      ? { running: component.running }
+      : {}),
+  };
 };

@@ -117,6 +117,15 @@ export type WorkflowNodeStatusOverlay = {
   readonly errorCode?: string;
 };
 
+type WorkflowNodeOptionalData = Pick<
+  WorkflowFlowNodeData,
+  "capability" | "agent" | "delayMs"
+>;
+
+type UndefinedStripped<Value extends Record<string, unknown>> = {
+  readonly [Key in keyof Value]?: Exclude<Value[Key], undefined>;
+};
+
 const kindY: Record<WorkflowNodeKind, number> = {
   source: 80,
   capability: 20,
@@ -135,6 +144,45 @@ const hintsFor = (
     .filter((hint) => hint.target === target && hint.id === id)
     .map(({ severity, message }) => ({ severity, message }));
 
+const compactUndefined = <Value extends Record<string, unknown>>(
+  value: Value,
+): UndefinedStripped<Value> =>
+  Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  ) as UndefinedStripped<Value>;
+
+const optionalNodeData = (
+  data: WorkflowNodeOptionalData,
+): Partial<WorkflowNodeOptionalData> =>
+  compactUndefined({
+    capability: data.capability,
+    agent: data.agent,
+    delayMs: data.delayMs,
+  });
+
+const resetRunData = (data: WorkflowFlowNodeData): WorkflowFlowNodeData => ({
+  label: data.label,
+  kind: data.kind,
+  ...optionalNodeData(data),
+  validationHints: data.validationHints,
+});
+
+const stageRunMetadata = (
+  run: WorkflowStageRunForCanvas,
+): Pick<WorkflowNodeStatusOverlay, "summary" | "errorCode"> =>
+  compactUndefined({
+    summary: run.summary ?? undefined,
+    errorCode: run.errorCode ?? undefined,
+  });
+
+const overlayRunData = (
+  overlay: WorkflowNodeStatusOverlay,
+): Pick<WorkflowFlowNodeData, "runSummary" | "runErrorCode"> =>
+  compactUndefined({
+    runSummary: overlay.summary,
+    runErrorCode: overlay.errorCode,
+  });
+
 export const deriveWorkflowFlowModel = (
   graph: DurableWorkflowGraphForCanvas,
   validationHints: readonly WorkflowValidationHint[] = [],
@@ -145,9 +193,7 @@ export const deriveWorkflowFlowModel = (
     data: {
       label: `${node.kind}: ${node.label}`,
       kind: node.kind,
-      ...(node.capability !== undefined ? { capability: node.capability } : {}),
-      ...(node.agent !== undefined ? { agent: node.agent } : {}),
-      ...(node.delayMs !== undefined ? { delayMs: node.delayMs } : {}),
+      ...optionalNodeData(node),
       validationHints: hintsFor(validationHints, "node", node.id),
     },
     type: "default",
@@ -212,85 +258,105 @@ export const mapWorkflowStageStatus = (
   }
 };
 
+const latestRunWins = (
+  run: WorkflowStageRunForCanvas,
+  current: WorkflowStageRunForCanvas | undefined,
+): boolean =>
+  run.attemptNumber >= (current?.attemptNumber ?? Number.NEGATIVE_INFINITY);
+
+const latestRunsByStageKey = (
+  stageRuns: readonly WorkflowStageRunForCanvas[],
+): ReadonlyMap<string, WorkflowStageRunForCanvas> => {
+  const latestRuns = new Map<string, WorkflowStageRunForCanvas>();
+
+  for (const run of stageRuns) {
+    const current = latestRuns.get(run.stageKey);
+    if (latestRunWins(run, current)) {
+      latestRuns.set(run.stageKey, run);
+    }
+  }
+
+  return latestRuns;
+};
+
+const mappedStageEntries = (
+  stageMap: WorkflowStageKeyMap,
+  nodeIds: ReadonlySet<string>,
+): readonly (readonly [string, string])[] =>
+  Object.entries(stageMap).filter(([, nodeId]) => nodeIds.has(nodeId));
+
+const pendingOverlay = (nodeId: string): WorkflowNodeStatusOverlay => ({
+  nodeId,
+  status: "pending",
+});
+
+const stageRunOverlay = (
+  nodeId: string,
+  run: WorkflowStageRunForCanvas,
+): WorkflowNodeStatusOverlay => ({
+  nodeId,
+  status: mapWorkflowStageStatus(run.status),
+  ...stageRunMetadata(run),
+});
+
+const overlayForStageRun = (
+  nodeId: string,
+  run: WorkflowStageRunForCanvas | undefined,
+): WorkflowNodeStatusOverlay =>
+  run === undefined ? pendingOverlay(nodeId) : stageRunOverlay(nodeId, run);
+
 export const mapStageRunsToOverlay = (
   stageRuns: readonly WorkflowStageRunForCanvas[],
   stageMap: WorkflowStageKeyMap,
   nodeIds: readonly string[],
 ): readonly WorkflowNodeStatusOverlay[] => {
-  const latestRuns = new Map<string, WorkflowStageRunForCanvas>();
-  for (const run of stageRuns) {
-    const current = latestRuns.get(run.stageKey);
-    if (current === undefined || run.attemptNumber >= current.attemptNumber) {
-      latestRuns.set(run.stageKey, run);
-    }
-  }
-
+  const latestRuns = latestRunsByStageKey(stageRuns);
   const nodeIdSet = new Set(nodeIds);
-  return Object.entries(stageMap)
-    .filter(([, nodeId]) => nodeIdSet.has(nodeId))
-    .map(([stageKey, nodeId]) => {
-      const run = latestRuns.get(stageKey);
-      if (run === undefined) {
-        return { nodeId, status: "pending" };
-      }
-      return {
-        nodeId,
-        status: mapWorkflowStageStatus(run.status),
-        ...(run.summary === null || run.summary === undefined
-          ? {}
-          : { summary: run.summary }),
-        ...(run.errorCode === null || run.errorCode === undefined
-          ? {}
-          : { errorCode: run.errorCode }),
-      };
-    });
+
+  return mappedStageEntries(stageMap, nodeIdSet).map(([stageKey, nodeId]) =>
+    overlayForStageRun(nodeId, latestRuns.get(stageKey)),
+  );
+};
+
+const overlayMapByNodeId = (
+  overlays: readonly WorkflowNodeStatusOverlay[],
+): ReadonlyMap<string, WorkflowNodeStatusOverlay> =>
+  new Map(overlays.map((overlay) => [overlay.nodeId, overlay]));
+
+const nodeWithOverlay = (
+  node: WorkflowFlowNode,
+  overlay: WorkflowNodeStatusOverlay,
+): WorkflowFlowNode => ({
+  ...node,
+  data: {
+    ...resetRunData(node.data),
+    status: overlay.status,
+    ...overlayRunData(overlay),
+  },
+});
+
+const applyNodeOverlay = (
+  node: WorkflowFlowNode,
+  overlays: ReadonlyMap<string, WorkflowNodeStatusOverlay>,
+): WorkflowFlowNode => {
+  const overlay = overlays.get(node.id);
+  return overlay === undefined ? node : nodeWithOverlay(node, overlay);
+};
+
+const modelWithStatusOverlays = (
+  model: WorkflowFlowModel,
+  overlays: readonly WorkflowNodeStatusOverlay[],
+): WorkflowFlowModel => {
+  const overlaysByNodeId = overlayMapByNodeId(overlays);
+
+  return {
+    ...model,
+    nodes: model.nodes.map((node) => applyNodeOverlay(node, overlaysByNodeId)),
+  };
 };
 
 export const applyStatusOverlay = (
   model: WorkflowFlowModel,
   overlays: readonly WorkflowNodeStatusOverlay[],
-): WorkflowFlowModel => {
-  if (overlays.length === 0) {
-    return model;
-  }
-
-  const overlayByNodeId = new Map(
-    overlays.map((overlay) => [overlay.nodeId, overlay]),
-  );
-
-  return {
-    ...model,
-    nodes: model.nodes.map((node) => {
-      const overlay = overlayByNodeId.get(node.id);
-      if (overlay === undefined) {
-        return node;
-      }
-      const data: WorkflowFlowNodeData = {
-        label: node.data.label,
-        kind: node.data.kind,
-        ...(node.data.capability !== undefined
-          ? { capability: node.data.capability }
-          : {}),
-        ...(node.data.agent !== undefined ? { agent: node.data.agent } : {}),
-        ...(node.data.delayMs !== undefined
-          ? { delayMs: node.data.delayMs }
-          : {}),
-        validationHints: node.data.validationHints,
-      };
-
-      return {
-        ...node,
-        data: {
-          ...data,
-          status: overlay.status,
-          ...(overlay.summary !== undefined
-            ? { runSummary: overlay.summary }
-            : {}),
-          ...(overlay.errorCode !== undefined
-            ? { runErrorCode: overlay.errorCode }
-            : {}),
-        },
-      };
-    }),
-  };
-};
+): WorkflowFlowModel =>
+  overlays.length === 0 ? model : modelWithStatusOverlays(model, overlays);

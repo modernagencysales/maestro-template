@@ -4,9 +4,13 @@ import { api } from "../convex/_generated/api";
 import {
   executeHeadlessOperation,
   type HeadlessExecutorRequest,
-  type JsonValue,
 } from "./manifest/executor";
 import { buildGeneratedOpenApiDocument } from "./manifest/openapi";
+import {
+  executorRequestFor,
+  readJsonBody,
+  type TemplateApiRequestBody,
+} from "./httpRequest";
 
 type ManifestFunction = (typeof confectManifest.functions)[number];
 
@@ -34,45 +38,20 @@ export type HeadlessHttpCtx = {
   ) => Promise<unknown>;
 };
 
-type TemplateApiRequestBody = {
-  readonly workspaceSlug?: string;
-  readonly input?: Record<string, JsonValue>;
-  readonly idempotencyKey?: string;
-};
+type TemplateRouteMatch =
+  | { readonly kind: "openapi" }
+  | { readonly kind: "docs" }
+  | { readonly kind: "operation"; readonly operationId: string }
+  | { readonly kind: "notFound"; readonly pathname: string };
 
-type TemplateHttpFailure = {
-  readonly ok: false;
-  readonly error: {
-    readonly _tag: "ValidationFailed";
-    readonly message: string;
-  };
+const staticTemplateRoutes: Record<string, TemplateRouteMatch | undefined> = {
+  "/api/openapi.json": { kind: "openapi" },
+  "/api/docs": { kind: "docs" },
 };
-
-type ParsedTemplateApiRequestBody =
-  | { readonly ok: true; readonly body: TemplateApiRequestBody }
-  | TemplateHttpFailure;
 
 const operationRefs = {
   "brain.pages.createMarkdown": api.brain.pages.createMarkdown,
 } satisfies Record<string, unknown>;
-
-// Demo HTTP requests use the same reviewer-facing slug seeded in tenancy tests.
-const demoWorkspaceIdsBySlug = {
-  "acme-demo": "workspace_123",
-} as const satisfies Record<string, string>;
-
-const validationFailed = (message: string): TemplateHttpFailure => ({
-  ok: false,
-  error: {
-    _tag: "ValidationFailed",
-    message,
-  },
-});
-
-const workspaceSlugToId = (workspaceSlug: string): string | undefined =>
-  demoWorkspaceIdsBySlug[
-    workspaceSlug.trim() as keyof typeof demoWorkspaceIdsBySlug
-  ];
 
 export const securityHeaders = {
   "content-security-policy":
@@ -145,124 +124,6 @@ const htmlResponse = (html: string): Response =>
     }),
   });
 
-const readJsonBody = async (
-  request: Request,
-): Promise<ParsedTemplateApiRequestBody> => {
-  if (!request.body) {
-    return { ok: true, body: {} };
-  }
-
-  const contentType = request.headers.get("content-type") ?? "";
-
-  if (!contentType.includes("application/json")) {
-    return { ok: true, body: {} };
-  }
-
-  let value: unknown;
-  try {
-    value = await request.json();
-  } catch {
-    return validationFailed("Request body must be valid JSON.");
-  }
-
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: true, body: {} };
-  }
-
-  return { ok: true, body: value as TemplateApiRequestBody };
-};
-
-const requiredStringInput = (
-  operationId: string,
-  input: Record<string, JsonValue>,
-  field: string,
-): { readonly ok: true; readonly value: string } | TemplateHttpFailure => {
-  const value = input[field];
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return validationFailed(
-      `Operation ${operationId} requires nonblank input.${field}.`,
-    );
-  }
-  return { ok: true, value };
-};
-
-const executorRequestFor = (
-  operationId: string,
-  body: TemplateApiRequestBody,
-):
-  | { readonly ok: true; readonly request: HeadlessExecutorRequest }
-  | TemplateHttpFailure => {
-  const input = body.input ?? {};
-
-  if (operationId === "brain.pages.createMarkdown") {
-    if (
-      body.idempotencyKey?.trim() === "" ||
-      body.idempotencyKey === undefined
-    ) {
-      return validationFailed(
-        "Operation brain.pages.createMarkdown requires a nonblank idempotencyKey.",
-      );
-    }
-
-    const workspaceId =
-      typeof input.workspaceId === "string" && input.workspaceId.trim()
-        ? input.workspaceId.trim()
-        : body.workspaceSlug === undefined
-          ? undefined
-          : workspaceSlugToId(body.workspaceSlug);
-
-    if (!workspaceId) {
-      return validationFailed(
-        "Operation brain.pages.createMarkdown requires input.workspaceId or a known workspaceSlug.",
-      );
-    }
-
-    const slug = requiredStringInput(operationId, input, "slug");
-    if (!slug.ok) {
-      return slug;
-    }
-
-    const title = requiredStringInput(operationId, input, "title");
-    if (!title.ok) {
-      return title;
-    }
-
-    const markdown = requiredStringInput(operationId, input, "markdown");
-    if (!markdown.ok) {
-      return markdown;
-    }
-
-    return {
-      ok: true,
-      request: {
-        operationId,
-        surface: "api",
-        input: {
-          workspaceId,
-          slug: slug.value,
-          title: title.value,
-          markdown: markdown.value,
-        },
-        ...(body.idempotencyKey === undefined
-          ? {}
-          : { idempotencyKey: body.idempotencyKey }),
-      },
-    };
-  }
-
-  return {
-    ok: true,
-    request: {
-      operationId,
-      surface: "api",
-      input,
-      ...(body.idempotencyKey === undefined
-        ? {}
-        : { idempotencyKey: body.idempotencyKey }),
-    },
-  };
-};
-
 const runTemplateApiOperation = async (
   ctx: HeadlessHttpCtx,
   request: HeadlessExecutorRequest,
@@ -277,81 +138,133 @@ const runTemplateApiOperation = async (
     request,
   );
 
-export const handleTemplateHttpRequest = async (
+const templateRouteForPath = (pathname: string): TemplateRouteMatch => {
+  const apiEntry = confectManifest.functions.find(
+    (entry) =>
+      hasSurface(entry, "api") && `/api/${entry.operationId}` === pathname,
+  );
+  const route =
+    staticTemplateRoutes[pathname] ??
+    (apiEntry
+      ? { kind: "operation", operationId: apiEntry.operationId }
+      : { kind: "notFound", pathname });
+
+  return route;
+};
+
+const templateRouteResponse = async (
   ctx: HeadlessHttpCtx,
   request: Request,
+  route: TemplateRouteMatch,
 ): Promise<Response> => {
-  const url = new URL(request.url);
+  let response: Response;
 
-  if (url.pathname === "/api/openapi.json") {
-    if (request.method !== "GET") {
-      return jsonResponse({
+  switch (route.kind) {
+    case "openapi":
+      response = openApiRouteResponse(request);
+      break;
+    case "docs":
+      response = docsRouteResponse(request);
+      break;
+    case "operation":
+      response = await operationRouteResponse(ctx, request, route.operationId);
+      break;
+    case "notFound":
+      response = notFoundRouteResponse(route.pathname);
+      break;
+  }
+
+  return response;
+};
+
+const openApiRouteResponse = (request: Request): Response =>
+  request.method === "GET"
+    ? jsonResponse(buildGeneratedOpenApiDocument())
+    : jsonResponse({
         ok: false,
         error: {
           _tag: "MethodNotAllowed",
           message: "Only GET is supported for OpenAPI docs.",
         },
       });
-    }
 
-    return jsonResponse(buildGeneratedOpenApiDocument());
-  }
-
-  if (url.pathname === "/api/docs") {
-    if (request.method !== "GET") {
-      return jsonResponse({
+const docsRouteResponse = (request: Request): Response =>
+  request.method === "GET"
+    ? htmlResponse(scalarDocsHtml())
+    : jsonResponse({
         ok: false,
         error: {
           _tag: "MethodNotAllowed",
           message: "Only GET is supported for Scalar docs.",
         },
       });
-    }
 
-    return htmlResponse(scalarDocsHtml());
-  }
+const operationRouteResponse = async (
+  ctx: HeadlessHttpCtx,
+  request: Request,
+  operationId: string,
+): Promise<Response> => {
+  const response =
+    request.method === "POST"
+      ? await executeTemplateApiRoute(ctx, request, operationId)
+      : jsonResponse({
+          ok: false,
+          error: {
+            _tag: "MethodNotAllowed",
+            message: `Only POST is supported for /api/${operationId}.`,
+          },
+        });
 
-  const apiEntry = confectManifest.functions.find(
-    (entry) =>
-      hasSurface(entry, "api") && `/api/${entry.operationId}` === url.pathname,
-  );
+  return response;
+};
 
-  if (apiEntry) {
-    if (request.method !== "POST") {
-      return jsonResponse({
-        ok: false,
-        error: {
-          _tag: "MethodNotAllowed",
-          message: `Only POST is supported for /api/${apiEntry.operationId}.`,
-        },
-      });
-    }
+const executeTemplateApiRoute = async (
+  ctx: HeadlessHttpCtx,
+  request: Request,
+  operationId: string,
+): Promise<Response> => {
+  const parsedBody = await readJsonBody(request);
+  const response = parsedBody.ok
+    ? await responseForParsedTemplateApiBody(ctx, operationId, parsedBody.body)
+    : jsonResponse(parsedBody);
 
-    const parsedBody = await readJsonBody(request);
-    if (!parsedBody.ok) {
-      return jsonResponse(parsedBody);
-    }
+  return response;
+};
 
-    const executorRequest = executorRequestFor(
-      apiEntry.operationId,
-      parsedBody.body,
-    );
-    if (!executorRequest.ok) {
-      return jsonResponse(executorRequest);
-    }
+const responseForParsedTemplateApiBody = async (
+  ctx: HeadlessHttpCtx,
+  operationId: string,
+  body: TemplateApiRequestBody,
+): Promise<Response> => {
+  const executorRequest = executorRequestFor(operationId, body);
+  const response = executorRequest.ok
+    ? jsonResponse(await runTemplateApiOperation(ctx, executorRequest.request))
+    : jsonResponse(executorRequest);
 
-    return jsonResponse(
-      await runTemplateApiOperation(ctx, executorRequest.request),
-    );
-  }
+  return response;
+};
 
-  return jsonResponse({
+const notFoundRouteResponse = (pathname: string): Response =>
+  jsonResponse({
     ok: false,
     error: {
       _tag: "NotFound",
-      message: `Unknown template HTTP route: ${url.pathname}`,
+      message: `Unknown template HTTP route: ${pathname}`,
     },
   });
+
+export const handleTemplateHttpRequest = async (
+  ctx: HeadlessHttpCtx,
+  request: Request,
+): Promise<Response> => {
+  const url = new URL(request.url);
+  const response = await templateRouteResponse(
+    ctx,
+    request,
+    templateRouteForPath(url.pathname),
+  );
+
+  return response;
 };
 
 /**

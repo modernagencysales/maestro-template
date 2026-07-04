@@ -33,81 +33,147 @@ export const requireEditorDocumentAccess = async (
   documentId: string,
   role: EditorRole,
 ): Promise<void> => {
-  const workspaceId = await resolveEditorWorkspaceId(ctx, documentId);
-  if (workspaceId === null) {
-    throw new Error("Editor document target is not readable.");
-  }
+  const workspaceId = await requireReadableEditorWorkspaceId(ctx, documentId);
+  const user = await loadActiveEditorUser(ctx);
+  const workspaceRow = await loadEditorWorkspace(ctx, workspaceId);
+  const organization = await loadEditorOrganization(
+    ctx,
+    workspaceRow.organizationId,
+  );
+  const memberships = await loadEditorMemberships(ctx, {
+    workspaceId,
+    organizationId: workspaceRow.organizationId,
+    userId: user._id,
+  });
 
-  const identity = await ctx.auth.getUserIdentity();
-  if (identity === null) {
-    throw new Error("Editor sync requires authentication.");
-  }
+  requireResolvedEditorAccess(
+    resolveEditorAccessRole({
+      userId: user._id,
+      workspaceRow,
+      organization,
+      ...memberships,
+    }),
+    role,
+  );
+};
 
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
-    .unique();
+const requireReadableEditorWorkspaceId = async (
+  ctx: EditorAuthCtx,
+  documentId: string,
+): Promise<string> =>
+  requirePresent(
+    await resolveEditorWorkspaceId(ctx, documentId),
+    "Editor document target is not readable.",
+  );
 
-  if (user === null) {
-    throw new Error("Editor sync requires a provisioned user.");
-  }
+const loadActiveEditorUser = async (ctx: EditorAuthCtx) => {
+  const identity = requirePresent(
+    await ctx.auth.getUserIdentity(),
+    "Editor sync requires authentication.",
+  );
+  const user = requirePresent(
+    await ctx.db
+      .query("users")
+      .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
+      .unique(),
+    "Editor sync requires a provisioned user.",
+  );
+
+  return requireActiveEditorUser(user);
+};
+
+const requireActiveEditorUser = <User extends { readonly status: string }>(
+  user: User,
+): User => {
   if (user.status !== "active") {
     throw new Error("Editor sync requires an active user.");
   }
+  return user;
+};
 
-  const workspace = await ctx.db.normalizeId("workspaces", workspaceId);
-  if (workspace === null) {
-    throw new Error("Editor sync requires an active workspace.");
-  }
-  const workspaceRow = await ctx.db.get(workspace);
-  if (workspaceRow === null) {
-    throw new Error("Editor sync requires an active workspace.");
-  }
-
-  const organizationId = ctx.db.normalizeId(
-    "organizations",
-    workspaceRow.organizationId,
+const loadEditorWorkspace = async (ctx: EditorAuthCtx, workspaceId: string) => {
+  const workspace = requirePresent(
+    ctx.db.normalizeId("workspaces", workspaceId),
+    "Editor sync requires an active workspace.",
   );
-  if (organizationId === null) {
-    throw new Error("Editor sync requires an active organization.");
-  }
-  const organization = await ctx.db.get(organizationId);
-  if (organization === null) {
-    throw new Error("Editor sync requires an active organization.");
-  }
 
+  return requirePresent(
+    await ctx.db.get(workspace),
+    "Editor sync requires an active workspace.",
+  );
+};
+
+const loadEditorOrganization = async (
+  ctx: EditorAuthCtx,
+  organizationId: string,
+) => {
+  const organization = requirePresent(
+    ctx.db.normalizeId("organizations", organizationId),
+    "Editor sync requires an active organization.",
+  );
+
+  return requirePresent(
+    await ctx.db.get(organization),
+    "Editor sync requires an active organization.",
+  );
+};
+
+const loadEditorMemberships = async (
+  ctx: EditorAuthCtx,
+  input: {
+    readonly workspaceId: string;
+    readonly organizationId: string;
+    readonly userId: string;
+  },
+) => {
   const workspaceMembers = await ctx.db
     .query("workspaceMembers")
     .withIndex("by_workspace_user", (q) =>
-      q.eq("workspaceId", workspaceId).eq("userId", user._id),
+      q.eq("workspaceId", input.workspaceId).eq("userId", input.userId),
     )
     .collect();
   const organizationMembers = await ctx.db
     .query("organizationMembers")
     .withIndex("by_organization_user", (q) =>
-      q
-        .eq("organizationId", workspaceRow.organizationId)
-        .eq("userId", user._id),
+      q.eq("organizationId", input.organizationId).eq("userId", input.userId),
     )
     .collect();
 
-  const resolution = resolveEffectiveWorkspaceRole({
+  return { workspaceMembers, organizationMembers };
+};
+
+const resolveEditorAccessRole = (input: {
+  readonly userId: string;
+  readonly workspaceRow: Omit<WorkspaceRef, "id"> & {
+    readonly _id: string;
+  };
+  readonly organization: Omit<OrganizationRef, "id"> & {
+    readonly _id: string;
+  };
+  readonly workspaceMembers: readonly WorkspaceMemberRef[];
+  readonly organizationMembers: readonly OrganizationMemberRef[];
+}) =>
+  resolveEffectiveWorkspaceRole({
     nowMs: editorSyncAccessTimeMs,
-    userId: user._id,
+    userId: input.userId,
     workspace: {
-      id: workspaceRow._id,
-      organizationId: workspaceRow.organizationId,
-      status: workspaceRow.status,
+      id: input.workspaceRow._id,
+      organizationId: input.workspaceRow.organizationId,
+      status: input.workspaceRow.status,
     } satisfies WorkspaceRef,
     organization: {
-      id: organization._id,
-      status: organization.status,
+      id: input.organization._id,
+      status: input.organization.status,
     } satisfies OrganizationRef,
-    workspaceMembers: workspaceMembers as WorkspaceMemberRef[],
-    organizationMembers: organizationMembers as OrganizationMemberRef[],
+    workspaceMembers: input.workspaceMembers,
+    organizationMembers: input.organizationMembers,
     guestGrants: [],
   });
 
+const requireResolvedEditorAccess = (
+  resolution: ReturnType<typeof resolveEffectiveWorkspaceRole>,
+  role: EditorRole,
+): void => {
   if (!resolution.ok) {
     throw new Error("Editor sync requires workspace membership.");
   }
@@ -119,4 +185,11 @@ export const requireEditorDocumentAccess = async (
         : "Editor sync requires workspace membership.",
     );
   }
+};
+
+const requirePresent = <Value>(value: Value | null, message: string): Value => {
+  if (value === null) {
+    throw new Error(message);
+  }
+  return value;
 };

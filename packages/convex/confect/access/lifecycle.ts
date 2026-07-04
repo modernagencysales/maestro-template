@@ -10,7 +10,14 @@ import {
   ValidationFailed,
 } from "../errors";
 import { normalizeEmail } from "./email";
-import { roleAtLeast, type Role } from "./roles";
+import {
+  requireActorCanGrant,
+  requireActorCanManage,
+  requireLiveWorkspaceMember,
+  requireNotLastOwner,
+  requireOwnerRoleChangeAllowed,
+} from "./lifecycleMemberGuards";
+import type { Role } from "./roles";
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -91,6 +98,21 @@ const fail = <E extends AccessLifecycleError>(
   error: E,
 ): PlannerResult<never, E> => Either.left(error);
 const succeed = <A>(value: A): PlannerResult<A, never> => Either.right(value);
+const flatMapPlannerResult = <
+  A,
+  E1 extends AccessLifecycleError,
+  B,
+  E2 extends AccessLifecycleError,
+>(
+  result: PlannerResult<A, E1>,
+  f: (value: A) => PlannerResult<B, E2>,
+): PlannerResult<B, E1 | E2> =>
+  Either.isLeft(result) ? fail(result.left) : f(result.right);
+const mapPlannerResult = <A, E extends AccessLifecycleError, B>(
+  result: PlannerResult<A, E>,
+  f: (value: A) => B,
+): PlannerResult<B, E> =>
+  Either.isLeft(result) ? fail(result.left) : succeed(f(result.right));
 
 export const changeMemberRole = (input: {
   readonly actorUserId: string;
@@ -107,29 +129,9 @@ export const changeMemberRole = (input: {
   },
   Forbidden | LastOwnerProtected | MemberNotInWorkspace
 > => {
-  const liveTarget = requireLiveWorkspaceMember(
-    input.target,
-    input.workspaceId,
-  );
-  if (Either.isLeft(liveTarget)) return fail(liveTarget.left);
-  const canManage = requireActorCanManage(
-    input.actorRole,
-    liveTarget.right.role,
-  );
-  if (Either.isLeft(canManage)) return fail(canManage.left);
-  const canGrant = requireActorCanGrant(input.actorRole, input.newRole);
-  if (Either.isLeft(canGrant)) return fail(canGrant.left);
-  if (liveTarget.right.role === "owner" && input.newRole !== "owner") {
-    const notLastOwner = requireNotLastOwner(
-      input.workspaceId,
-      input.liveWorkspaceMembers,
-    );
-    if (Either.isLeft(notLastOwner)) return fail(notLastOwner.left);
-  }
-
-  return succeed({
+  return mapPlannerResult(requireRoleChangeTarget(input), (liveTarget) => ({
     patch: {
-      id: liveTarget.right.id,
+      id: liveTarget.id,
       value: { role: input.newRole, updatedAt: input.now },
     },
     events: [
@@ -138,15 +140,47 @@ export const changeMemberRole = (input: {
         workspaceId: input.workspaceId,
         actorUserId: input.actorUserId,
         subjectKind: "workspaceMember",
-        subjectId: liveTarget.right.id,
+        subjectId: liveTarget.id,
         metadata: {
-          previousRole: liveTarget.right.role,
+          previousRole: liveTarget.role,
           nextRole: input.newRole,
         },
       },
     ],
-  });
+  }));
 };
+
+const requireRoleChangeTarget = (input: {
+  readonly actorRole: Role;
+  readonly workspaceId: string;
+  readonly target: WorkspaceMemberLifecycleRef;
+  readonly liveWorkspaceMembers: readonly WorkspaceMemberLifecycleRef[];
+  readonly newRole: Role;
+}): PlannerResult<
+  WorkspaceMemberLifecycleRef,
+  Forbidden | LastOwnerProtected | MemberNotInWorkspace
+> =>
+  flatMapPlannerResult(
+    requireLiveWorkspaceMember(input.target, input.workspaceId),
+    (liveTarget) =>
+      flatMapPlannerResult(
+        requireActorCanManage(input.actorRole, liveTarget.role),
+        () =>
+          flatMapPlannerResult(
+            requireActorCanGrant(input.actorRole, input.newRole),
+            () =>
+              mapPlannerResult(
+                requireOwnerRoleChangeAllowed(
+                  liveTarget,
+                  input.newRole,
+                  input.workspaceId,
+                  input.liveWorkspaceMembers,
+                ),
+                () => liveTarget,
+              ),
+          ),
+      ),
+  );
 
 export const removeMember = (input: {
   readonly actorUserId: string;
@@ -466,69 +500,6 @@ export const cancelInvitation = (input: {
       },
     ],
   });
-};
-
-const requireLiveWorkspaceMember = (
-  member: WorkspaceMemberLifecycleRef,
-  workspaceId: string,
-): PlannerResult<WorkspaceMemberLifecycleRef, MemberNotInWorkspace> => {
-  if (
-    member.workspaceId !== workspaceId ||
-    member.status !== "active" ||
-    member.acceptedAt === null ||
-    member.revokedAt !== null ||
-    member.deletedAt !== null
-  ) {
-    return fail(new MemberNotInWorkspace({ membershipId: member.id }));
-  }
-  return succeed(member);
-};
-
-const requireActorCanManage = (
-  actorRole: Role,
-  targetRole: Role,
-): PlannerResult<void, Forbidden> => {
-  if (!roleAtLeast(actorRole, targetRole)) {
-    return fail(
-      new Forbidden({
-        reason: "Cannot manage a member with a higher role.",
-      }),
-    );
-  }
-  return succeed(undefined);
-};
-
-const requireActorCanGrant = (
-  actorRole: Role,
-  newRole: Role,
-): PlannerResult<void, Forbidden> => {
-  if (!roleAtLeast(actorRole, newRole)) {
-    return fail(
-      new Forbidden({
-        reason: "Cannot grant a role higher than your own.",
-      }),
-    );
-  }
-  return succeed(undefined);
-};
-
-const requireNotLastOwner = (
-  workspaceId: string,
-  members: readonly WorkspaceMemberLifecycleRef[],
-): PlannerResult<void, LastOwnerProtected> => {
-  const liveOwners = members.filter(
-    (member) =>
-      member.workspaceId === workspaceId &&
-      member.role === "owner" &&
-      member.status === "active" &&
-      member.acceptedAt !== null &&
-      member.revokedAt === null &&
-      member.deletedAt === null,
-  );
-  if (liveOwners.length <= 1) {
-    return fail(new LastOwnerProtected({ workspaceId }));
-  }
-  return succeed(undefined);
 };
 
 const requireNormalizedEmail = (

@@ -10,6 +10,7 @@ exclude_patterns = [
   "**/coverage/**",
   "**/_generated/**",
   "apps/web/src/routeTree.gen.ts",
+  "packages/template-core/src/generated/**",
   "**/*.d.ts",
   "pnpm-lock.yaml",
   "tooling/**",

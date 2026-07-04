@@ -48,68 +48,111 @@ export const createPrimitiveContract = (
   contract: PrimitiveContract,
 ): PrimitiveContract => contract;
 
+type PrimitiveContractCheckContext = {
+  readonly contract: PrimitiveContract;
+  readonly fileKinds: ReadonlySet<PrimitiveFileKind>;
+  readonly hasConfectRuntime: boolean;
+};
+
+type PrimitiveContractCheck = (
+  context: PrimitiveContractCheckContext,
+) => PrimitiveContractFinding | undefined;
+
+const requirePrimitiveName: PrimitiveContractCheck = ({ contract }) =>
+  contract.name.trim().length === 0
+    ? { field: "name", message: "Primitive name is required." }
+    : undefined;
+
+const requirePrimitiveNamespace: PrimitiveContractCheck = ({ contract }) =>
+  contract.namespace.trim().length === 0
+    ? {
+        field: "namespace",
+        message: "Primitive namespace is required.",
+      }
+    : undefined;
+
+const requirePrimitiveVersion: PrimitiveContractCheck = ({ contract }) =>
+  contract.version < 1
+    ? {
+        field: "version",
+        message: "Primitive version must be at least 1.",
+      }
+    : undefined;
+
+const requireDomainOrViewModel: PrimitiveContractCheck = ({ fileKinds }) =>
+  !fileKinds.has("domain") && !fileKinds.has("frontend-state")
+    ? {
+        field: "files",
+        message: "Each primitive needs a pure domain or view-model file.",
+      }
+    : undefined;
+
+const requireConfectFiles: PrimitiveContractCheck = ({
+  fileKinds,
+  hasConfectRuntime,
+}) =>
+  hasConfectRuntime && (!fileKinds.has("spec") || !fileKinds.has("impl"))
+    ? {
+        field: "files",
+        message: "Confect primitives need both spec and impl files.",
+      }
+    : undefined;
+
+const requireManifestMetadata: PrimitiveContractCheck = ({
+  contract,
+  fileKinds,
+}) =>
+  contract.surfaces.length > 0 && !fileKinds.has("manifest")
+    ? {
+        field: "files",
+        message: "Exposed primitives need manifest metadata.",
+      }
+    : undefined;
+
+const requireWorkflowHandler: PrimitiveContractCheck = ({
+  contract,
+  fileKinds,
+}) =>
+  contract.hasInternalWorkflowStep && !fileKinds.has("workflow-handler")
+    ? {
+        field: "files",
+        message:
+          "Workflow-step primitives need a workflow handler or dispatch file.",
+      }
+    : undefined;
+
+const requireFrontendState: PrimitiveContractCheck = ({
+  contract,
+  fileKinds,
+}) =>
+  contract.uiStates.length > 0 && !fileKinds.has("frontend-state")
+    ? {
+        field: "files",
+        message: "UI-visible primitives need a frontend state file.",
+      }
+    : undefined;
+
+const primitiveContractChecks: readonly PrimitiveContractCheck[] = [
+  requirePrimitiveName,
+  requirePrimitiveNamespace,
+  requirePrimitiveVersion,
+  requireDomainOrViewModel,
+  requireConfectFiles,
+  requireManifestMetadata,
+  requireWorkflowHandler,
+  requireFrontendState,
+];
+
 export const checkPrimitiveContract = (
   contract: PrimitiveContract,
 ): readonly PrimitiveContractFinding[] => {
-  const findings: PrimitiveContractFinding[] = [];
   const fileKinds = new Set(contract.files.map((file) => file.kind));
   const hasConfectRuntime = contract.runtimes.some((runtime) =>
     runtime.startsWith("confect-"),
   );
 
-  if (contract.name.trim().length === 0) {
-    findings.push({ field: "name", message: "Primitive name is required." });
-  }
-
-  if (contract.namespace.trim().length === 0) {
-    findings.push({
-      field: "namespace",
-      message: "Primitive namespace is required.",
-    });
-  }
-
-  if (contract.version < 1) {
-    findings.push({
-      field: "version",
-      message: "Primitive version must be at least 1.",
-    });
-  }
-
-  if (!fileKinds.has("domain") && !fileKinds.has("frontend-state")) {
-    findings.push({
-      field: "files",
-      message: "Each primitive needs a pure domain or view-model file.",
-    });
-  }
-
-  if (hasConfectRuntime && (!fileKinds.has("spec") || !fileKinds.has("impl"))) {
-    findings.push({
-      field: "files",
-      message: "Confect primitives need both spec and impl files.",
-    });
-  }
-
-  if (contract.surfaces.length > 0 && !fileKinds.has("manifest")) {
-    findings.push({
-      field: "files",
-      message: "Exposed primitives need manifest metadata.",
-    });
-  }
-
-  if (contract.hasInternalWorkflowStep && !fileKinds.has("workflow-handler")) {
-    findings.push({
-      field: "files",
-      message:
-        "Workflow-step primitives need a workflow handler or dispatch file.",
-    });
-  }
-
-  if (contract.uiStates.length > 0 && !fileKinds.has("frontend-state")) {
-    findings.push({
-      field: "files",
-      message: "UI-visible primitives need a frontend state file.",
-    });
-  }
-
-  return findings;
+  return primitiveContractChecks.flatMap((check) => {
+    const finding = check({ contract, fileKinds, hasConfectRuntime });
+    return finding === undefined ? [] : [finding];
+  });
 };
