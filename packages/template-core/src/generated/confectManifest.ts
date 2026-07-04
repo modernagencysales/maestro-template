@@ -71,4 +71,439 @@ export const confectManifest = {
   ],
 } as const;
 
+export const confectJsonSchemas = {
+  openApi31: {
+    "brain.pages.createMarkdown.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId", "slug", "title", "markdown"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+        slug: {
+          type: "string",
+        },
+        title: {
+          type: "string",
+        },
+        markdown: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+    "brain.pages.createMarkdown.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "string",
+    },
+    "brain.pages.list.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+    "brain.pages.list.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "array",
+      items: {
+        type: "object",
+        required: [
+          "_id",
+          "_creationTime",
+          "workspaceId",
+          "slug",
+          "title",
+          "markdown",
+          "sourceKind",
+          "updatedAt",
+        ],
+        properties: {
+          _id: {
+            type: "string",
+          },
+          _creationTime: {
+            type: "number",
+          },
+          workspaceId: {
+            type: "string",
+          },
+          slug: {
+            type: "string",
+          },
+          title: {
+            type: "string",
+          },
+          markdown: {
+            type: "string",
+          },
+          editorSnapshotJson: {
+            type: "string",
+          },
+          editorSnapshotVersion: {
+            type: "number",
+          },
+          sourceKind: {
+            type: "string",
+            enum: ["markdown", "link", "note"],
+          },
+          updatedAt: {
+            type: "number",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    "capabilities.sourceGroundedBrief.run.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId", "sourceIds", "briefGoal", "idempotencyKey"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+        sourceIds: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+          description: "an array of at least 1 item(s)",
+          title: "minItems(1)",
+          minItems: 1,
+        },
+        briefGoal: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+        idempotencyKey: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+      },
+      additionalProperties: false,
+    },
+    "capabilities.sourceGroundedBrief.run.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: [
+        "briefMarkdown",
+        "sourceTitles",
+        "policySnapshotId",
+        "modelReceiptId",
+        "trustClaim",
+      ],
+      properties: {
+        briefMarkdown: {
+          type: "string",
+        },
+        sourceTitles: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        policySnapshotId: {
+          type: "string",
+        },
+        modelReceiptId: {
+          type: "string",
+        },
+        trustClaim: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+    "capabilities.sourceGroundedBrief.runInternal.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId", "sourceIds", "briefGoal", "idempotencyKey"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+        sourceIds: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+          description: "an array of at least 1 item(s)",
+          title: "minItems(1)",
+          minItems: 1,
+        },
+        briefGoal: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+        idempotencyKey: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+      },
+      additionalProperties: false,
+    },
+    "capabilities.sourceGroundedBrief.runInternal.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: [
+        "briefMarkdown",
+        "sourceTitles",
+        "policySnapshotId",
+        "modelReceiptId",
+        "trustClaim",
+      ],
+      properties: {
+        briefMarkdown: {
+          type: "string",
+        },
+        sourceTitles: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        policySnapshotId: {
+          type: "string",
+        },
+        modelReceiptId: {
+          type: "string",
+        },
+        trustClaim: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  mcp: {
+    "brain.pages.createMarkdown.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId", "slug", "title", "markdown"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+        slug: {
+          type: "string",
+        },
+        title: {
+          type: "string",
+        },
+        markdown: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+    "brain.pages.createMarkdown.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "string",
+    },
+    "brain.pages.list.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+    "brain.pages.list.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "array",
+      items: {
+        type: "object",
+        required: [
+          "_id",
+          "_creationTime",
+          "workspaceId",
+          "slug",
+          "title",
+          "markdown",
+          "sourceKind",
+          "updatedAt",
+        ],
+        properties: {
+          _id: {
+            type: "string",
+          },
+          _creationTime: {
+            type: "number",
+          },
+          workspaceId: {
+            type: "string",
+          },
+          slug: {
+            type: "string",
+          },
+          title: {
+            type: "string",
+          },
+          markdown: {
+            type: "string",
+          },
+          editorSnapshotJson: {
+            type: "string",
+          },
+          editorSnapshotVersion: {
+            type: "number",
+          },
+          sourceKind: {
+            type: "string",
+            enum: ["markdown", "link", "note"],
+          },
+          updatedAt: {
+            type: "number",
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    "capabilities.sourceGroundedBrief.run.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId", "sourceIds", "briefGoal", "idempotencyKey"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+        sourceIds: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+          description: "an array of at least 1 item(s)",
+          title: "minItems(1)",
+          minItems: 1,
+        },
+        briefGoal: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+        idempotencyKey: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+      },
+      additionalProperties: false,
+    },
+    "capabilities.sourceGroundedBrief.run.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: [
+        "briefMarkdown",
+        "sourceTitles",
+        "policySnapshotId",
+        "modelReceiptId",
+        "trustClaim",
+      ],
+      properties: {
+        briefMarkdown: {
+          type: "string",
+        },
+        sourceTitles: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        policySnapshotId: {
+          type: "string",
+        },
+        modelReceiptId: {
+          type: "string",
+        },
+        trustClaim: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+    "capabilities.sourceGroundedBrief.runInternal.args": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["workspaceId", "sourceIds", "briefGoal", "idempotencyKey"],
+      properties: {
+        workspaceId: {
+          type: "string",
+        },
+        sourceIds: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+          description: "an array of at least 1 item(s)",
+          title: "minItems(1)",
+          minItems: 1,
+        },
+        briefGoal: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+        idempotencyKey: {
+          type: "string",
+          description: "a string at least 1 character(s) long",
+          title: "minLength(1)",
+          minLength: 1,
+        },
+      },
+      additionalProperties: false,
+    },
+    "capabilities.sourceGroundedBrief.runInternal.returns": {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: [
+        "briefMarkdown",
+        "sourceTitles",
+        "policySnapshotId",
+        "modelReceiptId",
+        "trustClaim",
+      ],
+      properties: {
+        briefMarkdown: {
+          type: "string",
+        },
+        sourceTitles: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        policySnapshotId: {
+          type: "string",
+        },
+        modelReceiptId: {
+          type: "string",
+        },
+        trustClaim: {
+          type: "string",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+} as const;
+
 export type ConfectManifest = typeof confectManifest;

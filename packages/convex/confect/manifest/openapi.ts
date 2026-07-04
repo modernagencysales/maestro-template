@@ -1,16 +1,19 @@
-import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";
+import {
+  confectJsonSchemas,
+  confectManifest,
+} from "@maestro-template/template-core/generated/confectManifest";
 
-type JsonSchema = {
-  readonly type?: string;
-  readonly properties?: Record<string, JsonSchema>;
-  readonly required?: readonly string[];
-  readonly enum?: readonly string[];
-  readonly additionalProperties?: boolean;
-};
+const openApiRequestSchemaFor = (schemaName: string): unknown => {
+  const schema =
+    confectJsonSchemas.openApi31[
+      schemaName as keyof typeof confectJsonSchemas.openApi31
+    ];
 
-const objectSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: true,
+  if (schema === undefined) {
+    throw new Error(`Missing OpenAPI JSON schema for ${schemaName}.`);
+  }
+
+  return schema;
 };
 
 export const buildGeneratedOpenApiDocument = () => ({
@@ -34,7 +37,7 @@ export const buildGeneratedOpenApiDocument = () => ({
               required: true,
               content: {
                 "application/json": {
-                  schema: objectSchema,
+                  schema: openApiRequestSchemaFor(entry.argsSchemaName),
                 },
               },
             },

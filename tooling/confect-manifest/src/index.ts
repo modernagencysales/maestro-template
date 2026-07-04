@@ -1,3 +1,4 @@
+import * as JSONSchema from "effect/JSONSchema";
 import type * as Schema from "effect/Schema";
 
 export type ContractFunctionKind = "query" | "mutation" | "action";
@@ -25,6 +26,11 @@ export type ContractManifest = {
 export type ContractSchemaRegistry = Readonly<
   Record<string, Schema.Schema.Any>
 >;
+
+export type ContractJsonSchemas = {
+  readonly openApi31: Readonly<Record<string, unknown>>;
+  readonly mcp: Readonly<Record<string, unknown>>;
+};
 
 export const buildContractManifest = (
   functions: readonly ContractFunctionManifest[],
@@ -62,6 +68,29 @@ export const duplicateOperationIds = (
 export const mergeContractSchemaRegistries = (
   ...registries: readonly ContractSchemaRegistry[]
 ): ContractSchemaRegistry => Object.assign({}, ...registries);
+
+export const buildContractJsonSchemas = (
+  schemaRegistry: ContractSchemaRegistry,
+): ContractJsonSchemas => {
+  const registryEntries = Object.entries(schemaRegistry).sort(
+    ([left], [right]) => left.localeCompare(right),
+  );
+
+  return {
+    openApi31: Object.fromEntries(
+      registryEntries.map(([name, schema]) => [
+        name,
+        JSONSchema.make(schema, { target: "openApi3.1" }),
+      ]),
+    ),
+    mcp: Object.fromEntries(
+      registryEntries.map(([name, schema]) => [
+        name,
+        JSONSchema.make(schema, { target: "jsonSchema2020-12" }),
+      ]),
+    ),
+  };
+};
 
 export const missingSchemasForManifest = (
   manifest: ContractManifest,

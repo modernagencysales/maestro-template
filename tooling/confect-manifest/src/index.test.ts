@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as Schema from "effect/Schema";
 import {
   buildContractManifest,
+  buildContractJsonSchemas,
   duplicateOperationIds,
   manifestOperationIds,
   mergeContractSchemaRegistries,
@@ -133,5 +134,39 @@ describe("confect manifest tooling", () => {
         "b.run.args": Schema.String,
       }),
     ).toEqual(["a.list.args", "a.list.returns", "b.run.returns"]);
+  });
+
+  it("builds Effect JSON schemas for OpenAPI and MCP targets", () => {
+    expect(
+      buildContractJsonSchemas({
+        "a.run.args": Schema.Struct({
+          workspaceId: Schema.String,
+          title: Schema.String,
+        }),
+        "a.run.returns": Schema.Struct({
+          ok: Schema.Literal(true),
+        }),
+      }),
+    ).toMatchObject({
+      openApi31: {
+        "a.run.args": {
+          type: "object",
+          required: ["workspaceId", "title"],
+          properties: {
+            workspaceId: { type: "string" },
+            title: { type: "string" },
+          },
+        },
+      },
+      mcp: {
+        "a.run.returns": {
+          type: "object",
+          required: ["ok"],
+          properties: {
+            ok: { type: "boolean", enum: [true] },
+          },
+        },
+      },
+    });
   });
 });

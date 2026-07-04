@@ -144,8 +144,9 @@ Target rules:
 - Writes exposed over API, CLI, or MCP require an idempotency key argument.
 - Tenant identity is server-derived through a Principal and workspace access
   resolver, never trusted from caller-supplied workspace slug alone.
-- OpenAPI schemas are generated from Effect schemas with `effect/JSONSchema`
-  after Confect schema restrictions are satisfied.
+- OpenAPI and MCP JSON schemas are generated from the spec-bound Effect schema
+  registry with `effect/JSONSchema`; the generated manifest serializes schema
+  names and JSON schema objects, not live Effect schema handles.
 - Public error envelopes encode only the declared public `_tag` and redacted
   fields.
 

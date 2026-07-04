@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import templateHttp from "../confect/http";
+import { buildGeneratedMcpTools } from "../confect/manifest/mcp";
 import {
   type HeadlessHttpCtx,
   handleTemplateHttpRequest,
@@ -77,13 +78,18 @@ describe("template HTTP docs routes", () => {
           post: {
             operationId: "brain.pages.createMarkdown",
             tags: ["template-headless"],
+            "x-maestro-typed-errors": [
+              "Unauthorized",
+              "MemberNotInWorkspace",
+              "WorkspaceNotFound",
+            ],
             requestBody: {
               required: true,
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
-                    additionalProperties: true,
+                    required: ["workspaceId", "slug", "title", "markdown"],
                   },
                 },
               },
@@ -95,6 +101,27 @@ describe("template HTTP docs routes", () => {
           },
         },
       },
+    });
+  });
+
+  it("serves MCP tools with generated Effect JSON schemas", () => {
+    const createMarkdownTool = buildGeneratedMcpTools().find(
+      (tool) => tool.name === "template.brain.pages.createMarkdown",
+    );
+
+    expect(createMarkdownTool?.inputSchema).toMatchObject({
+      type: "object",
+      required: ["workspaceId", "slug", "title", "markdown"],
+      properties: {
+        workspaceId: { type: "string" },
+        slug: { type: "string" },
+        title: { type: "string" },
+        markdown: { type: "string" },
+      },
+    });
+    expect(createMarkdownTool?.inputSchema).not.toEqual({
+      type: "object",
+      additionalProperties: true,
     });
   });
 
