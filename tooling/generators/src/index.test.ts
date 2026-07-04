@@ -676,7 +676,7 @@ describe("template app factory generators", () => {
     }
   });
 
-  it("builds workflow generator files with graph and headless metadata", () => {
+  it("builds workflow generator files with durable Confect contracts", () => {
     const generated = buildWorkflowFiles({
       name: "source grounded plan",
       description: "Builds a sourced plan with approval and receipt.",
@@ -687,29 +687,63 @@ describe("template app factory generators", () => {
       pascalName: "SourceGroundedPlan",
     });
     expect(generated.files.map((file) => file.path)).toEqual([
-      "generated/workflows/sourceGroundedPlan/sourceGroundedPlan.workflow.json",
-      "generated/workflows/sourceGroundedPlan/sourceGroundedPlan.metadata.json",
-      "generated/workflows/sourceGroundedPlan/sourceGroundedPlan.test.ts",
-      "generated/workflows/sourceGroundedPlan/README.md",
+      "packages/convex/confect/workflows/sourceGroundedPlan.spec.ts",
+      "packages/convex/confect/workflows/sourceGroundedPlan.impl.ts",
+      "packages/convex/confect/workflows/sourceGroundedPlan.graph.ts",
+      "packages/convex/convex/workflows/sourceGroundedPlan.ts",
+      "packages/convex/test/sourceGroundedPlan.workflow.test.ts",
+      "docs/template/generated/workflows/sourceGroundedPlan.md",
     ]);
-    expect(JSON.parse(generated.files[0]?.content ?? "{}")).toMatchObject({
-      nodes: expect.arrayContaining([
-        expect.objectContaining({ id: "source" }),
-        expect.objectContaining({ id: "receipt" }),
-      ]),
-    });
-    expect(JSON.parse(generated.files[1]?.content ?? "{}")).toMatchObject({
-      surfaces: ["web", "cli", "mcp"],
-      requiredCapabilities: ["summarizeSource", "createTrustReceipt"],
-      requiredFiles: expect.arrayContaining([
-        "durable workflow graph",
-        "tests",
-        "headless registry entry",
-      ]),
-      migrationNotes: expect.arrayContaining([
-        "Persist only durable workflow metadata, never React Flow node state.",
-      ]),
-    });
+    const spec = generated.files[0]?.content ?? "";
+    const impl = generated.files[1]?.content ?? "";
+    const graph = generated.files[2]?.content ?? "";
+    const convexWorkflow = generated.files[3]?.content ?? "";
+    const docs = generated.files[5]?.content ?? "";
+
+    expect(spec).toContain("defineContractFunction");
+    expect(spec).toContain("export const manifest");
+    expect(spec).toContain("export const schemaRegistry");
+    expect(spec).toContain('operationId: "workflows.sourceGroundedPlan.start"');
+    expect(spec).toContain(
+      'argsSchemaName: "workflows.sourceGroundedPlan.start.args"',
+    );
+    expect(spec).toContain(
+      'returnsSchemaName: "workflows.sourceGroundedPlan.start.returns"',
+    );
+    expect(spec).toContain(
+      'argsSchemaName: "workflows.sourceGroundedPlan.status.args"',
+    );
+    expect(spec).toContain(
+      'returnsSchemaName: "workflows.sourceGroundedPlan.status.returns"',
+    );
+    expect(spec).toContain(
+      'argsSchemaName: "workflows.sourceGroundedPlan.approve.args"',
+    );
+    expect(spec).toContain(
+      'returnsSchemaName: "workflows.sourceGroundedPlan.approve.returns"',
+    );
+    expect(spec).toContain("WorkflowStatusResult");
+
+    expect(impl).toContain("startWorkflowAndRecordOwnership");
+    expect(impl).toContain("workflowArgs:");
+    expect(impl).toContain("startedAt:");
+    expect(impl).not.toMatch(/\bargs:\s*\{ workspaceId, idempotencyKey \}/);
+    expect(impl).not.toContain("now:");
+
+    expect(convexWorkflow).toContain("defineWorkflow");
+    expect(convexWorkflow).toContain("runDurableGraphWorkflow");
+    expect(convexWorkflow).toContain("policySnapshot: {}");
+    expect(convexWorkflow).toContain("capabilityRegistry: {}");
+
+    expect(graph).toContain("satisfies DurableWorkflowGraph");
+    expect(graph).toContain('kind: "source"');
+    expect(graph).toContain('kind: "output"');
+    expect(graph).not.toContain('kind: "capability"');
+    expect(graph).not.toContain('kind: "approval"');
+
+    expect(docs).toContain("plain Convex durable replay handler");
+    expect(docs).toContain("workflows.sourceGroundedPlan.approve");
+    expect(docs).toContain("concrete `buildArgs` mappers");
   });
 
   it("writes generated workflow files through the CLI", () => {
@@ -727,19 +761,32 @@ describe("template app factory generators", () => {
         ],
         cwd,
       );
+      const specPath = join(
+        cwd,
+        "packages/convex/confect/workflows/sourceGroundedPlan.spec.ts",
+      );
       const graphPath = join(
         cwd,
-        "generated/workflows/sourceGroundedPlan/sourceGroundedPlan.workflow.json",
+        "packages/convex/confect/workflows/sourceGroundedPlan.graph.ts",
+      );
+      const workflowPath = join(
+        cwd,
+        "packages/convex/convex/workflows/sourceGroundedPlan.ts",
       );
 
       expect(result.exitCode).toBe(0);
+      expect(existsSync(specPath)).toBe(true);
       expect(existsSync(graphPath)).toBe(true);
-      expect(JSON.parse(readFileSync(graphPath, "utf8"))).toMatchObject({
-        id: "sourceGroundedPlan",
-        policy: {
-          audit: "record-workflow-run-and-trust-receipt",
-        },
-      });
+      expect(existsSync(workflowPath)).toBe(true);
+      expect(readFileSync(specPath, "utf8")).toContain(
+        "workflows.sourceGroundedPlan.start",
+      );
+      expect(readFileSync(graphPath, "utf8")).toContain(
+        "sourceGroundedPlanGraph",
+      );
+      expect(readFileSync(workflowPath, "utf8")).toContain(
+        "runDurableGraphWorkflow",
+      );
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
