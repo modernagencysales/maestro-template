@@ -259,6 +259,7 @@ const toInvitationRef = (invitation: InvitationsDoc): InvitationRef => ({
   invitedByUserId: invitation.invitedByUserId,
   acceptedAt: invitation.acceptedAt,
   revokedAt: invitation.revokedAt,
+  declinedAt: invitation.declinedAt ?? null,
   expiresAt: invitation.expiresAt,
   createdAt: invitation.createdAt,
   updatedAt: invitation.updatedAt,

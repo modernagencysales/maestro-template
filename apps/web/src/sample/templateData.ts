@@ -51,11 +51,11 @@ export const openApiSummary = {
       (surface) => surface.name === "Scalar API",
     )?.route ?? "/api/docs",
   typedErrors:
-    openApiDocument.paths[primaryApiOperationPath]?.post[
+    openApiDocument.paths[primaryApiOperationPath]?.post?.[
       "x-maestro-typed-errors"
     ] ?? [],
   authScope:
-    openApiDocument.paths[primaryApiOperationPath]?.post[
+    openApiDocument.paths[primaryApiOperationPath]?.post?.[
       "x-maestro-auth-scope"
     ] ?? "unknown",
 } as const;

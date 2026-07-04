@@ -36,6 +36,7 @@ export type InvitationRef = {
   readonly invitedByUserId: string;
   readonly acceptedAt: number | null;
   readonly revokedAt: number | null;
+  readonly declinedAt: number | null;
   readonly expiresAt: number;
   readonly createdAt: number;
   readonly updatedAt: number;
@@ -73,6 +74,7 @@ export const buildWorkspaceInvitation = (input: {
     invitedByUserId: input.invitedByUserId,
     acceptedAt: null,
     revokedAt: null,
+    declinedAt: null,
     expiresAt: input.now + INVITATION_TTL_MS,
     createdAt: input.now,
     updatedAt: input.now,
@@ -164,7 +166,7 @@ export const declineInvitation = (input: {
   {
     readonly invitationPatch: Patch<{
       readonly status: "declined";
-      readonly revokedAt: number;
+      readonly declinedAt: number;
       readonly updatedAt: number;
     }> | null;
     readonly events: readonly AccessLifecycleEvent[];
@@ -185,7 +187,7 @@ export const declineInvitation = (input: {
       id: invitation.right.id,
       value: {
         status: "declined",
-        revokedAt: input.now,
+        declinedAt: input.now,
         updatedAt: input.now,
       },
     },

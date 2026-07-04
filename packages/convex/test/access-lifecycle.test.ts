@@ -49,6 +49,7 @@ const invitation = (overrides: Partial<InvitationRef>): InvitationRef => ({
   invitedByUserId: "users_inviter",
   acceptedAt: null,
   revokedAt: null,
+  declinedAt: null,
   expiresAt: now + 10_000,
   createdAt: now - 100,
   updatedAt: now - 100,
@@ -372,7 +373,7 @@ describe("workspace invitation lifecycle policy", () => {
     expect(Either.isRight(declineEither)).toBe(true);
     expect(Either.getOrThrow(declineEither).invitationPatch).toEqual({
       id: "invitations_1",
-      value: { status: "declined", revokedAt: now, updatedAt: now },
+      value: { status: "declined", declinedAt: now, updatedAt: now },
     });
 
     expect(

@@ -1,6 +1,6 @@
 import type { CliResult } from "./types";
 
-export const json = (value: unknown): string =>
+export const formatJsonOutput = (value: unknown): string =>
   `${JSON.stringify(value, null, 2)}\n`;
 
 export const cliSuccess = (stdout: string): CliResult => ({

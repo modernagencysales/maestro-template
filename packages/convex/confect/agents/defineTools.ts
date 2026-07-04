@@ -56,18 +56,66 @@ export type ModelTool<Result = never> = {
   readonly present: (result: Result) => ToolPresentation;
 };
 
-type SourceGroundedBriefTool = ModelTool<
-  Schema.Schema.Type<typeof SourceGroundedBriefReturn>
-> & {
+type SourceGroundedBriefInput = Schema.Schema.Type<
+  typeof SourceGroundedBriefArgs
+>;
+type SourceGroundedBriefResult = Schema.Schema.Type<
+  typeof SourceGroundedBriefReturn
+>;
+
+type SourceGroundedBriefTool = ModelTool<SourceGroundedBriefResult> & {
   readonly name: "sourceGroundedBrief";
   readonly refId: "capabilities.sourceGroundedBrief.run";
   readonly grantId: "capability.run";
   readonly operationType: "mutation";
   readonly inputSchema: typeof SourceGroundedBriefArgs;
-  readonly present: (
-    result: Schema.Schema.Type<typeof SourceGroundedBriefReturn>,
-  ) => ToolPresentation;
+  readonly present: (result: SourceGroundedBriefResult) => ToolPresentation;
 };
+
+const buildSourceGroundedBriefPresentation = (
+  result: SourceGroundedBriefResult,
+): ToolPresentation => ({
+  title: "Source-grounded brief",
+  summary: `Grounded draft backed by ${result.sourceTitles.length} approved source${result.sourceTitles.length === 1 ? "" : "s"}.`,
+  trustClaim: result.trustClaim,
+  sourceTitles: result.sourceTitles,
+});
+
+const runSourceGroundedBriefTool = (
+  input: SourceGroundedBriefInput,
+): SourceGroundedBriefResult =>
+  runFakeSourceGroundedBrief({
+    input: normalizeSourceGroundedBriefInput(input),
+    sources: input.sourceIds.map((sourceId) => ({
+      id: sourceId,
+      title: `Source ${sourceId}`,
+      markdown: "Synthetic source content for fake-mode agent tool run.",
+    })),
+    policySnapshotId: `policy_snapshot_${input.idempotencyKey}`,
+    modelReceiptId: `model_receipt_${input.idempotencyKey}`,
+  });
+
+const buildSourceGroundedBriefExecution = (
+  input: SourceGroundedBriefInput,
+  toolName: SourceGroundedBriefTool["name"],
+  present: SourceGroundedBriefTool["present"],
+): ModelToolExecution => {
+  const result = runSourceGroundedBriefTool(input);
+
+  return {
+    assistantMessage: `I created a source-grounded brief using ${toolName}.`,
+    presentation: present(result),
+  };
+};
+
+const prepareSourceGroundedBriefInvocation = (
+  input: SourceGroundedBriefInput,
+  toolName: SourceGroundedBriefTool["name"],
+  present: SourceGroundedBriefTool["present"],
+): PreparedModelToolInvocation => ({
+  idempotencyKey: input.idempotencyKey,
+  execute: () => buildSourceGroundedBriefExecution(input, toolName, present),
+});
 
 export const sourceGroundedBriefTool: SourceGroundedBriefTool = {
   name: "sourceGroundedBrief",
@@ -86,35 +134,14 @@ export const sourceGroundedBriefTool: SourceGroundedBriefTool = {
 
     return {
       ok: true,
-      invocation: {
-        idempotencyKey: decoded.input.idempotencyKey,
-        execute: () => {
-          const result = runFakeSourceGroundedBrief({
-            input: normalizeSourceGroundedBriefInput(decoded.input),
-            sources: decoded.input.sourceIds.map((sourceId) => ({
-              id: sourceId,
-              title: `Source ${sourceId}`,
-              markdown:
-                "Synthetic source content for fake-mode agent tool run.",
-            })),
-            policySnapshotId: `policy_snapshot_${decoded.input.idempotencyKey}`,
-            modelReceiptId: `model_receipt_${decoded.input.idempotencyKey}`,
-          });
-
-          return {
-            assistantMessage: `I created a source-grounded brief using ${sourceGroundedBriefTool.name}.`,
-            presentation: sourceGroundedBriefTool.present(result),
-          };
-        },
-      },
+      invocation: prepareSourceGroundedBriefInvocation(
+        decoded.input,
+        sourceGroundedBriefTool.name,
+        sourceGroundedBriefTool.present,
+      ),
     };
   },
-  present: (result: Schema.Schema.Type<typeof SourceGroundedBriefReturn>) => ({
-    title: "Source-grounded brief",
-    summary: `Grounded draft backed by ${result.sourceTitles.length} approved source${result.sourceTitles.length === 1 ? "" : "s"}.`,
-    trustClaim: result.trustClaim,
-    sourceTitles: result.sourceTitles,
-  }),
+  present: buildSourceGroundedBriefPresentation,
 };
 
 const decodeSourceGroundedBriefToolInput = (

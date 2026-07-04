@@ -21,7 +21,7 @@ type RenderedDocumentPage = Omit<DocumentPage, "diagram"> &
   Pick<NotionDocumentPageModel, "diagram" | "diagramLabel">;
 
 const pageById = new Map(pages.map((page) => [page.id, page]));
-const samplePageKeyByRouteKey = new Map<string, string>([
+const samplePageIdByRouteKey = new Map<string, string>([
   ["home", "overview"],
   ["brain", "brain"],
   ["workflows", "workflows"],
@@ -43,7 +43,7 @@ const samplePageKeyByRouteKey = new Map<string, string>([
   ["admin", "admin"],
 ]);
 const sampleRouteKeyByPageId = new Map(
-  [...samplePageKeyByRouteKey.entries()].map(([key, value]) => [value, key]),
+  [...samplePageIdByRouteKey.entries()].map(([key, value]) => [value, key]),
 );
 const sampleNavigation = TEMPLATE_NAV_CATEGORIES.map((category) => ({
   ...category,
@@ -51,7 +51,7 @@ const sampleNavigation = TEMPLATE_NAV_CATEGORIES.map((category) => ({
     key: item.key,
     label: item.key === "health" ? "Safety" : item.label,
     icon: item.icon,
-    href: `#${samplePageKeyByRouteKey.get(item.key) ?? item.key}`,
+    href: `#${samplePageIdByRouteKey.get(item.key) ?? item.key}`,
     ...(item.key === "api" ? { hint: "Scalar" } : {}),
   })),
 }));
@@ -113,7 +113,7 @@ export function App() {
           activeKey={activeRouteKey}
           topbarTitle={activePage.title}
           onNavigate={(key) => {
-            const pageId = samplePageKeyByRouteKey.get(key) ?? "overview";
+            const pageId = samplePageIdByRouteKey.get(key) ?? "overview";
 
             setActiveNavId(pageId);
           }}

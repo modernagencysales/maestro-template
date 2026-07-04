@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { runTemplateApiOperation } from "@maestro-template/workflow-tooling";
 import { createCliHandlers } from "./commands";
-import { cliFailure, json } from "./result";
+import { cliFailure, formatJsonOutput } from "./result";
 import { decodeCliRuntimeConfig, emptyCliRuntimeConfig } from "./runtimeConfig";
 import { dispatchCliCommand } from "./router";
 import type {
@@ -34,7 +34,7 @@ const runStaticCliCapability = (
 
   return {
     exitCode: result.ok ? 0 : 1,
-    stdout: json(result),
+    stdout: formatJsonOutput(result),
     stderr: "",
   };
 };

@@ -6,13 +6,14 @@ import {
   callMcpTool,
   describeWorkflowTemplate,
   getHeadlessOperation,
+  runTemplateWorkflow,
 } from "@maestro-template/workflow-tooling";
 import {
   providerConfigReport,
   type ProviderMode,
 } from "@maestro-template/integrations";
 import { parseNamedArgs } from "./namedArgs";
-import { cliFailure, cliSuccess, json } from "./result";
+import { cliFailure, cliSuccess, formatJsonOutput } from "./result";
 import type {
   CliCapabilityRequest,
   CliCapabilityResolver,
@@ -21,7 +22,7 @@ import type {
   CliResult,
   CliRuntimeConfig,
 } from "./types";
-import { runWorkflowReceiptForCli } from "./workflowReceipt";
+import { buildWorkflowPayloadForCli } from "./workflowReceipt";
 
 type CliCommandDependencies = {
   readonly capability: CliCapabilityResolver;
@@ -50,12 +51,12 @@ const operationsResult = ({
   target,
 }: CliCommandContext): CliResult => {
   if (subcommand === "list") {
-    return cliSuccess(json(buildHeadlessOperations()));
+    return cliSuccess(formatJsonOutput(buildHeadlessOperations()));
   }
 
   const operation = getHeadlessOperation(target ?? "");
   return operation
-    ? cliSuccess(json(operation))
+    ? cliSuccess(formatJsonOutput(operation))
     : cliFailure(`Unknown operation: ${target}\n`);
 };
 
@@ -102,17 +103,20 @@ const capabilityResult = (
 
 const apiResult = ({ subcommand }: CliCommandContext): CliResult =>
   cliSuccess(
-    json(subcommand === "catalog" ? buildApiCatalog() : buildOpenApiDocument()),
+    formatJsonOutput(
+      subcommand === "catalog" ? buildApiCatalog() : buildOpenApiDocument(),
+    ),
   );
 
-const mcpToolsResult = (): CliResult => cliSuccess(json(buildMcpTools()));
+const mcpToolsResult = (): CliResult =>
+  cliSuccess(formatJsonOutput(buildMcpTools()));
 
 const mcpCallResult = ({ target }: CliCommandContext): CliResult => {
   const result = callMcpTool(target ?? "");
 
   return {
     exitCode: result.isError ? 1 : 0,
-    stdout: json(result),
+    stdout: formatJsonOutput(result),
     stderr: "",
   };
 };
@@ -132,7 +136,11 @@ const integrationsResult = (
 
   return providerMode === undefined
     ? cliFailure(`Unknown provider mode: ${mode}\n`)
-    : cliSuccess(json(providerConfigReport(providerMode, config.providerEnv)));
+    : cliSuccess(
+        formatJsonOutput(
+          providerConfigReport(providerMode, config.providerEnv),
+        ),
+      );
 };
 
 const workflowResult = ({ argv }: CliCommandContext): CliResult => {
@@ -141,7 +149,17 @@ const workflowResult = ({ argv }: CliCommandContext): CliResult => {
     return cliFailure(`${parsedArgs.message}\n`);
   }
 
-  return cliSuccess(json(runWorkflowReceiptForCli(parsedArgs.args)));
+  try {
+    return cliSuccess(
+      formatJsonOutput(
+        buildWorkflowPayloadForCli(runTemplateWorkflow(), parsedArgs.args),
+      ),
+    );
+  } catch (error) {
+    return cliFailure(
+      `${error instanceof Error ? error.message : "Workflow run failed."}\n`,
+    );
+  }
 };
 
 export const createCliHandlers = ({
@@ -154,7 +172,7 @@ export const createCliHandlers = ({
   },
   {
     matches: ({ command }) => command === "describe",
-    run: () => cliSuccess(json(describeWorkflowTemplate())),
+    run: () => cliSuccess(formatJsonOutput(describeWorkflowTemplate())),
   },
   {
     matches: ({ command, subcommand, target }) =>

@@ -1,4 +1,4 @@
-import { runTemplateWorkflow } from "@maestro-template/workflow-tooling";
+import type { runTemplateWorkflow } from "@maestro-template/workflow-tooling";
 import type { CliNamedArgs } from "./namedArgs";
 
 type WorkflowReceipt = ReturnType<typeof runTemplateWorkflow>;
@@ -62,13 +62,12 @@ const applyIdempotency = (
   };
 };
 
-export const runWorkflowReceiptForCli = (
+export const buildWorkflowPayloadForCli = (
+  receipt: WorkflowReceipt,
   args: CliNamedArgs,
 ): Record<string, unknown> => {
-  const receipt = runTemplateWorkflow();
   const payload: Record<string, unknown> = {
     ...receipt,
-    trustReceipt: receipt.trustReceipt,
   };
 
   applyStringArg(payload, "workflowId", args.workflowId);
