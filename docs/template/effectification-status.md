@@ -43,6 +43,9 @@ contract family.
   metadata until migrated.
 - PostHog failure capture currently covers selected mutation/action paths; query
   failure telemetry still needs a future durable event path.
+- `brain/pages.createMarkdown` is the first Confect mutation wrapped with
+  backend PostHog failure capture.
+- Remaining Confect groups are still unwrapped pending rollout/factory support.
 - Generated workflow graph data is emitted as JSON-safe TypeScript constants so
   it can be typechecked with the workflow schemas; consumers must still treat
   React Flow state as a projection, not durable source.
