@@ -28,6 +28,10 @@ import {
   runGeneratorCli,
 } from "./index";
 import { gtmImplementationBlueprint } from "./blueprints/gtmImplementation";
+import {
+  smokeWorkflowName,
+  workflowOutputSmokeScriptName,
+} from "./workflow-output-smoke";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(testDir, "../../..");
@@ -814,6 +818,22 @@ describe("template app factory generators", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it("exposes a dedicated generated workflow output smoke gate", () => {
+    const rootPackage = JSON.parse(
+      readFileSync(join(repoRoot, "package.json"), "utf8"),
+    ) as { readonly scripts?: Record<string, string> };
+    const smokeScriptPath = join(
+      repoRoot,
+      "tooling/generators/src/workflow-output-smoke.ts",
+    );
+
+    expect(rootPackage.scripts?.[workflowOutputSmokeScriptName]).toBe(
+      "tsx tooling/generators/src/workflow-output-smoke.ts",
+    );
+    expect(existsSync(smokeScriptPath)).toBe(true);
+    expect(smokeWorkflowName).toBe("generatedWorkflowSmoke");
   });
 
   it("builds production-target capability promotion files", () => {

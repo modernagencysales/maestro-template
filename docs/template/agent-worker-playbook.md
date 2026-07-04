@@ -25,8 +25,12 @@ Choose generators before hand-writing modules:
 - `template:quickstart` for a new fork.
 - `template:add-client-domain` for client nouns.
 - `template:add-capability` for a new operation.
-- `template:add-workflow` for a workflow graph.
-- `template:promote-capability` or `template:promote-workflow` after review.
+- `template:add-workflow` for a production-target workflow graph, contract,
+  runner, and test scaffold.
+- `template:promote-capability` after review when starting from reviewed
+  runtime/private capability artifacts.
+- `template:promote-workflow` only for older reviewed or private-package
+  workflow artifacts that still need migration into production-target paths.
 
 ## Layer Law
 

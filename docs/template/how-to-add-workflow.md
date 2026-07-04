@@ -12,6 +12,11 @@ Write the generated files:
 pnpm template:add-workflow -- --name sourceToBrief --description "Turns approved sources into a reviewed brief." --write
 ```
 
+`template:add-workflow` writes the production-target workflow contract, durable
+graph, runner, test scaffold, and generated docs directly. Do not run
+`template:promote-workflow` as the normal next step for files created by
+`template:add-workflow`.
+
 Regenerate Convex refs after the files are written and before typechecking the
 durable runner:
 
@@ -25,12 +30,6 @@ generated Convex modules, so if you run it after `template:add-workflow`, rerun
 the workflow generator or restore
 `packages/convex/convex/workflowRunners/<name>.ts` before Convex codegen and
 package typecheck.
-
-Promote reviewed files into production-target workflow paths:
-
-```bash
-pnpm template:promote-workflow -- --name sourceToBrief --description "Turns approved sources into a reviewed brief." --write
-```
 
 ## Files Created
 
@@ -58,6 +57,8 @@ internal capability ref.
 
 Use `template:promote-workflow` only for older review artifacts or private
 package promotion flows that still need promotion into production-target paths.
+For new generated workflows, `template:add-workflow -- --write` already writes
+those production-target paths.
 
 ## Tests
 
@@ -74,6 +75,7 @@ package promotion flows that still need promotion into production-target paths.
 
 - `pnpm --dir packages/convex exec convex codegen`
 - `pnpm --dir packages/convex typecheck`
+- `pnpm template:workflow-output-smoke`
 - `pnpm confect:codegen` when validating generated public workflow contract refs
 - `pnpm --dir packages/convex test workflows`
 - `pnpm --dir apps/web test src/features/workflows`

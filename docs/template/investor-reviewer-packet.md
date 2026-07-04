@@ -37,9 +37,10 @@ The current template proves these reusable primitives:
 - App factory commands for `template:quickstart`, `template:intake`,
   `template:seed-demo`, `template:handoff`, `template:init`, `template:doctor`,
   `template:add-capability`, `template:add-workflow`,
-  `template:promote-capability`, `template:promote-workflow`,
-  `template:upgrade`, and private-package dry-run/import with source-module
-  scaffolds for imported capabilities and workflows.
+  `template:workflow-output-smoke`, `template:promote-capability`,
+  legacy/private-package `template:promote-workflow`, `template:upgrade`, and
+  private-package dry-run/import with source-module scaffolds for imported
+  capabilities and workflows.
 - Cloudflare Pages deployment wiring and static hosted smoke checks.
 - A documented TanStack Start migration decision that preserves the current Vite
   static hosted app until Start has equivalent smoke coverage.
@@ -96,7 +97,7 @@ pnpm template:seed-demo -- --blueprint source-grounded-gtm-brain --write
 pnpm template:add-capability -- --name summarizeSource
 pnpm template:add-workflow -- --name sourceGroundedPlan
 pnpm template:promote-capability -- --name summarizeSource
-pnpm template:promote-workflow -- --name sourceGroundedPlan
+pnpm template:workflow-output-smoke
 pnpm template:handoff -- --mode fake --write
 pnpm template:upgrade -- --from client-v1.0.0 --to template-v1.1.0
 pnpm template:private-package:dry-run -- --fixture examples/generic-ai-ops

@@ -36,6 +36,7 @@
     "template:add-workflow": "tsx tooling/generators/src/index.ts add-workflow",
     "template:promote-capability": "tsx tooling/generators/src/index.ts promote-capability",
     "template:promote-workflow": "tsx tooling/generators/src/index.ts promote-workflow",
+    "template:workflow-output-smoke": "tsx tooling/generators/src/workflow-output-smoke.ts",
     "template:upgrade": "tsx tooling/generators/src/index.ts upgrade",
     "template:private-package:dry-run": "tsx tooling/generators/src/index.ts private-package:dry-run",
     "template:private-package:import": "tsx tooling/generators/src/index.ts private-package:import",

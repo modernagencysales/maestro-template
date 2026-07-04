@@ -61,18 +61,23 @@ not template-core assumptions.
    `pnpm template:add-capability -- --name summarizeSource --write`.
 7. Add a first workflow with
    `pnpm template:add-workflow -- --name sourceGroundedPlan --write`.
-8. Promote reviewed capability/workflow artifacts with
-   `pnpm template:promote-capability -- --name summarizeSource --write` and
-   `pnpm template:promote-workflow -- --name sourceGroundedPlan --write`.
-9. Import reviewed private packages with
-   `pnpm template:private-package:import -- --fixture <fixture> --write`; keep
-   generated source modules under `private-packages/<package>/` until review.
-10. Add domain modules with `template:add-client-domain`.
-11. Add capabilities, workflows, agents, Brain schemas, API surfaces, source
+8. Regenerate Convex refs and typecheck the generated workflow package output:
+   `pnpm --dir packages/convex exec convex codegen` and
+   `pnpm --dir packages/convex typecheck`. In the template repo, use
+   `pnpm template:workflow-output-smoke` to repeat this in an isolated temp
+   copy.
+9. Use `template:promote-workflow` only when migrating older reviewed workflow
+   artifacts or private-package workflow modules into production-target paths.
+   New `template:add-workflow -- --write` output is already production-target.
+10. Import reviewed private packages with
+    `pnpm template:private-package:import -- --fixture <fixture> --write`; keep
+    generated source modules under `private-packages/<package>/` until review.
+11. Add domain modules with `template:add-client-domain`.
+12. Add capabilities, workflows, agents, Brain schemas, API surfaces, source
     types, notifications, admin surfaces, and data lifecycle resources through
     the matching generators.
-12. Run focused verification for each generated change.
-13. Run `pnpm template:handoff -- --mode fake --write` and full verification
+13. Run focused verification for each generated change.
+14. Run `pnpm template:handoff -- --mode fake --write` and full verification
     before a client handoff.
 
 See `docs/template/quickstart.md` for the 10-minute fake-mode path, 30-minute
