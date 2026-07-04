@@ -29,6 +29,9 @@ export default defineConfig({
       "@maestro-template/ui": fileURLToPath(
         new URL("../../packages/ui/src/index.tsx", import.meta.url),
       ),
+      "@maestro-template/convex/refs": fileURLToPath(
+        new URL("../../packages/convex/src/refs.ts", import.meta.url),
+      ),
       "@maestro-template/template-core": fileURLToPath(
         new URL("../../packages/template-core/src/index.ts", import.meta.url),
       ),

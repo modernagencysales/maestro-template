@@ -1,6 +1,6 @@
 import type { Ref } from "@confect/core";
 import type { ReactMutation } from "@confect/react";
-import type { TemplateConfectRefs } from "@maestro-template/convex";
+import type { TemplateConfectRefs } from "@maestro-template/convex/refs";
 import { describe, expectTypeOf, it } from "vitest";
 import {
   type TemplateDataState,

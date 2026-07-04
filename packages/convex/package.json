@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./dist/src/index.js"
+    },
+    "./refs": {
+      "types": "./src/refs.ts",
+      "default": "./dist/src/refs.js"
     }
   },
   "scripts": {
