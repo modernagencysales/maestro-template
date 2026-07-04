@@ -14,6 +14,8 @@ export type EditorRole = "viewer" | "editor";
 
 type EditorAuthCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>;
 
+const editorSyncAccessTimeMs = 0;
+
 export const resolveEditorWorkspaceId = async (
   ctx: EditorAuthCtx,
   documentId: string,
@@ -90,7 +92,7 @@ export const requireEditorDocumentAccess = async (
     .collect();
 
   const resolution = resolveEffectiveWorkspaceRole({
-    nowMs: Date.now(),
+    nowMs: editorSyncAccessTimeMs,
     userId: user._id,
     workspace: {
       id: workspaceRow._id,
