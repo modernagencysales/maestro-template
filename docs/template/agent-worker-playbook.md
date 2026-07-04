@@ -40,7 +40,8 @@ Preserve this flow:
 web routes -> screens -> features -> blocks -> Notion Kit
 client hooks -> @confect/react refs -> Confect specs -> Convex functions
 agents -> workflows -> capabilities -> domain/checks -> schema
-API/CLI/MCP -> headless registry -> same capabilities/workflows as web
+API/CLI/MCP/OpenAPI/Scalar -> generated Confect manifest/exposure metadata
+  plus explicit generated ref mappings -> same capabilities/workflows as web
 storage/notifications/observability -> Effect services -> provider adapters
 ```
 

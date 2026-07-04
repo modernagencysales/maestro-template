@@ -23,8 +23,10 @@ The current template proves these reusable primitives:
 - A hosted static reference app with Brain, workflow, capability, agent,
   integration, API/CLI/MCP, receipt, and safety surfaces.
 - A React Flow workflow primitive through `packages/workflow-ui`.
-- A canonical typed template registry in `packages/template-core`.
-- Headless projections for API, CLI, MCP, and OpenAPI from the same registry.
+- A canonical typed generated manifest and metadata model in
+  `packages/template-core`.
+- Headless projections for API, CLI, MCP, OpenAPI, and Scalar from generated
+  Confect manifest/exposure metadata plus explicit generated ref mappings.
 - A deterministic workflow run receipt and Trust Receipt path.
 - Confect/Effect backend slices with Effect schemas, typed errors, generated
   refs, and plain Convex Workpool interop.
@@ -112,7 +114,8 @@ The intended layer law is:
 web routes -> screens -> features -> blocks -> Notion Kit
 client hooks -> @confect/react refs -> Confect specs -> Convex functions
 agents -> workflows -> capabilities -> domain/checks -> schema
-API/CLI/MCP -> headless registry -> same capabilities/workflows as web
+API/CLI/MCP/OpenAPI/Scalar -> generated Confect manifest/exposure metadata
+  plus explicit generated ref mappings -> same capabilities/workflows as web
 storage/notifications/observability -> Effect services -> provider adapters
 admin/support/privacy -> audited capabilities -> narrow operator surfaces
 ```

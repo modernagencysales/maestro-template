@@ -16,8 +16,8 @@ without copying project-specific business logic into the core framework.
 - Use [env-manifest.md](./env-manifest.md) as the provider setup source of
   truth.
 - Add client domain nouns through generators.
-- Keep Confect specs, frontend adapters, headless registry entries, docs, and
-  tests together.
+- Keep Confect specs, generated manifest/headless metadata, generated ref
+  mappings, frontend adapters, docs, and tests together.
 - Promote runtime-authored capabilities to generated source when compile-time
   guarantees matter.
 - Keep private client packages separate from the template core.
@@ -61,11 +61,12 @@ not template-core assumptions.
    `pnpm template:add-capability -- --name summarizeSource --write`.
 7. Add a first workflow with
    `pnpm template:add-workflow -- --name sourceGroundedPlan --write`.
-8. Regenerate Convex refs and typecheck the generated workflow package output:
-   `pnpm --dir packages/convex exec convex codegen` and
-   `pnpm --dir packages/convex typecheck`. In the template repo, use
-   `pnpm template:workflow-output-smoke` to repeat this in an isolated temp
-   copy.
+8. Regenerate generated contracts before wiring generated wrappers:
+   `pnpm confect:codegen`, `pnpm confect:manifest`, then the relevant focused
+   tests and gates for the changed surface. Run Convex codegen only when the
+   generated slice also changes Convex deployment refs. In the template repo,
+   use `pnpm template:workflow-output-smoke` to repeat workflow output checks in
+   an isolated temp copy.
 9. Use `template:promote-workflow` only when migrating older reviewed workflow
    artifacts or private-package workflow modules into production-target paths.
    New `template:add-workflow -- --write` output is already production-target.
