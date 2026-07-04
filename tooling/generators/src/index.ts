@@ -1234,7 +1234,7 @@ export const buildWorkflowFiles = (
     `Generated ${name} workflow. Replace the source-to-receipt graph after review.`;
   const files: readonly GeneratedFile[] = [
     {
-      path: `packages/convex/confect/workflows/${name}.spec.ts`,
+      path: `packages/convex/confect/workflowContracts/${name}.spec.ts`,
       content: `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import {
@@ -1250,7 +1250,7 @@ import {
   WorkspaceNotFound,
 } from "../errors";
 import { Id } from "../_generated/id";
-import { WorkflowStatusResult } from "./_kit/status";
+import { WorkflowStatusResult } from "../workflows/_kit/status";
 
 const WorkflowErrors = Schema.Union(
   Unauthorized,
@@ -1382,14 +1382,23 @@ export default GroupSpec.make()
 `,
     },
     {
-      path: `packages/convex/confect/workflows/${name}.impl.ts`,
-      content: `import { getStatus, sendEvent, type WorkflowId } from "@convex-dev/workflow";
+      path: `packages/convex/confect/workflowContracts/${name}.impl.ts`,
+      content: `import {
+  getStatus,
+  sendEvent,
+  type WorkflowComponent,
+  type WorkflowId,
+} from "@convex-dev/workflow";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import { components, internal } from "../../convex/_generated/api";
+import {
+  componentsGeneric,
+  makeFunctionReference,
+  type FunctionReference,
+} from "convex/server";
 import databaseSchema from "../_generated/schema";
 import {
   DatabaseReader,
@@ -1397,10 +1406,19 @@ import {
   QueryCtx,
 } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
-import { NotFound } from "../errors";
-import { startWorkflowAndRecordOwnership } from "./_kit/ownership";
-import { projectWorkflowStatus } from "./_kit/status";
-import { ${name}Graph } from "./${name}.graph";
+import {
+  MemberNotInWorkspace,
+  NotFound,
+  Unauthorized,
+  ValidationFailed,
+  WorkspaceNotFound,
+} from "../errors";
+import { startWorkflowAndRecordOwnership } from "../workflows/_kit/ownership";
+import {
+  projectWorkflowStatus,
+  type WorkflowStatusRunProjection,
+} from "../workflows/_kit/status";
+import { ${name}Graph } from "../workflows/${name}.graph";
 import ${name} from "./${name}.spec";
 
 const withConfectClock = <A, E, R>(
@@ -1408,6 +1426,68 @@ const withConfectClock = <A, E, R>(
 ): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
   // Confect provides Clock at runtime, but its current handler type omits it.
   effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
+
+const workflowComponent =
+  componentsGeneric().workflow as unknown as WorkflowComponent;
+
+type WorkflowRunFunctionArgs = {
+  readonly args: {
+    readonly workspaceId: string;
+    readonly idempotencyKey: string;
+  };
+  readonly startAsync?: boolean;
+};
+
+const ${name}RunRef = makeFunctionReference<
+  "mutation",
+  WorkflowRunFunctionArgs,
+  WorkflowId
+>("workflowRunners/${name}:run") as unknown as FunctionReference<
+  "mutation",
+  "internal",
+  WorkflowRunFunctionArgs,
+  WorkflowId
+>;
+
+const errorMessage = (error: unknown): string | null => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return null;
+};
+
+const toWorkflowValidationFailed = (error: unknown): ValidationFailed =>
+  new ValidationFailed({
+    field: "workflow",
+    message: errorMessage(error) ?? "Unable to start workflow.",
+  });
+
+type WorkflowError =
+  | Unauthorized
+  | MemberNotInWorkspace
+  | WorkspaceNotFound
+  | NotFound
+  | ValidationFailed;
+
+const toWorkflowError = (error: unknown): WorkflowError => {
+  if (
+    error instanceof Unauthorized ||
+    error instanceof MemberNotInWorkspace ||
+    error instanceof WorkspaceNotFound ||
+    error instanceof NotFound ||
+    error instanceof ValidationFailed
+  ) {
+    return error;
+  }
+
+  return toWorkflowValidationFailed(error);
+};
 
 const findWorkflowRun = (
   workspaceId: string,
@@ -1448,7 +1528,7 @@ const startImpl = FunctionImpl.make(
       );
       const startedAt = yield* withConfectClock(Clock.currentTimeMillis);
       const componentWorkflowId = yield* startWorkflowAndRecordOwnership({
-        workflowRef: internal.workflows.${name}.run,
+        workflowRef: ${name}RunRef,
         workflowArgs: { workspaceId, idempotencyKey },
         workspaceId,
         workflowId: ${name}Graph.id,
@@ -1458,14 +1538,14 @@ const startImpl = FunctionImpl.make(
         startedByUserId: access.userId,
         startedAt: startedAt,
         workflowKind: "workflow.${name}",
-      });
+      }).pipe(Effect.mapError(toWorkflowValidationFailed));
 
       return {
         status: "queued" as const,
         workflow: "${name}" as const,
         componentWorkflowId,
       };
-    }),
+    }).pipe(Effect.mapError(toWorkflowError)),
 );
 
 const statusImpl = FunctionImpl.make(
@@ -1478,11 +1558,22 @@ const statusImpl = FunctionImpl.make(
       const run = yield* findWorkflowRun(workspaceId, componentWorkflowId);
       const ctx = yield* QueryCtx;
       const rawStatus = yield* Effect.promise(() =>
-        getStatus(ctx, components.workflow, componentWorkflowId as WorkflowId),
-      );
+        getStatus(ctx, workflowComponent, componentWorkflowId as WorkflowId),
+      ).pipe(Effect.mapError(toWorkflowValidationFailed));
+      const runProjection = {
+        ...(run.status !== undefined ? { status: run.status } : {}),
+        ...(run.deadlineAt !== undefined ? { deadlineAt: run.deadlineAt } : {}),
+        ...(run.timedOutAt !== undefined ? { timedOutAt: run.timedOutAt } : {}),
+        ...(run.timeoutErrorCode !== undefined
+          ? { timeoutErrorCode: run.timeoutErrorCode }
+          : {}),
+        ...(run.timeoutSummary !== undefined
+          ? { timeoutSummary: run.timeoutSummary }
+          : {}),
+      } satisfies WorkflowStatusRunProjection;
 
-      return projectWorkflowStatus(rawStatus, run);
-    }),
+      return projectWorkflowStatus(rawStatus, runProjection);
+    }).pipe(Effect.mapError(toWorkflowError)),
 );
 
 const approveImpl = FunctionImpl.make(
@@ -1495,15 +1586,15 @@ const approveImpl = FunctionImpl.make(
       yield* findWorkflowRun(workspaceId, componentWorkflowId);
       const ctx = yield* MutationCtx;
       const eventId = yield* Effect.promise(() =>
-        sendEvent(ctx, components.workflow, {
+        sendEvent(ctx, workflowComponent, {
           workflowId: componentWorkflowId as WorkflowId,
           name: ${name}Graph.id + "." + nodeId + ".approved",
           value: null,
         }),
-      );
+      ).pipe(Effect.mapError(toWorkflowValidationFailed));
 
       return { eventId };
-    }),
+    }).pipe(Effect.mapError(toWorkflowError)),
 );
 
 export default GroupImpl.make(databaseSchema, ${name}).pipe(
@@ -1548,7 +1639,7 @@ export const ${name}Graph = {
 `,
     },
     {
-      path: `packages/convex/convex/workflows/${name}.ts`,
+      path: `packages/convex/convex/workflowRunners/${name}.ts`,
       content: `import { defineWorkflow } from "@convex-dev/workflow";
 import { v } from "convex/values";
 import { components } from "../_generated/api";
@@ -1633,19 +1724,21 @@ ${description}
 
 ## Generated Files
 
-- \`packages/convex/convex/workflows/${name}.ts\`: plain Convex durable replay handler.
-- \`packages/convex/confect/workflows/${name}.spec.ts\`: typed start, status, and approval contract.
-- \`packages/convex/confect/workflows/${name}.impl.ts\`: Confect implementation that records workflow ownership and projects component status.
+- \`packages/convex/convex/workflowRunners/${name}.ts\`: plain Convex durable replay handler.
+- \`packages/convex/confect/workflowContracts/${name}.spec.ts\`: typed start, status, and approval contract.
+- \`packages/convex/confect/workflowContracts/${name}.impl.ts\`: Confect implementation that records workflow ownership and projects component status.
 - \`packages/convex/confect/workflows/${name}.graph.ts\`: durable graph data, initially source to Trust Receipt output only.
 - \`packages/convex/test/${name}.workflow.test.ts\`: focused runner scaffold for the default graph.
 
 ## Required Follow-Up
 
 1. Add the generated Confect group to the workflow spec tree.
-2. Keep React Flow as a projection of \`${name}.graph.ts\`; do not persist canvas node state as the workflow contract.
-3. Generated approval nodes require the generated \`workflows.${name}.approve\` mutation before they are usable.
-4. Generated capability nodes require registry entries with concrete \`buildArgs\` mappers for the target internal capability ref.
-5. Run \`pnpm check:workflow-graph-boundary\`, \`pnpm check:confect-contracts\`, and focused workflow tests.
+2. Run \`pnpm --dir packages/convex exec convex codegen\` after writing the generated files so \`workflowRunners/${name}:run\` exists before typecheck.
+   Run \`pnpm confect:codegen\` when validating the generated \`workflowContracts.${name}\` public wrappers; if Confect sync removes \`packages/convex/convex/workflowRunners/${name}.ts\`, rerun this generator before Convex codegen and typecheck.
+3. Keep React Flow as a projection of \`${name}.graph.ts\`; do not persist canvas node state as the workflow contract.
+4. Generated approval nodes require the generated \`workflowContracts.${name}.approve\` mutation before they are usable.
+5. Generated capability nodes require registry entries with concrete \`buildArgs\` mappers for the target internal capability ref.
+6. Run \`pnpm check:workflow-graph-boundary\`, \`pnpm check:confect-contracts\`, and focused workflow tests.
 `,
     },
   ];

@@ -12,6 +12,20 @@ Write the generated files:
 pnpm template:add-workflow -- --name sourceToBrief --description "Turns approved sources into a reviewed brief." --write
 ```
 
+Regenerate Convex refs after the files are written and before typechecking the
+durable runner:
+
+```bash
+pnpm --dir packages/convex exec convex codegen
+```
+
+Run `pnpm confect:codegen` when you need the generated
+`workflowContracts.<name>` public wrappers. The current Confect sync owns
+generated Convex modules, so if you run it after `template:add-workflow`, rerun
+the workflow generator or restore
+`packages/convex/convex/workflowRunners/<name>.ts` before Convex codegen and
+package typecheck.
+
 Promote reviewed files into production-target workflow paths:
 
 ```bash
@@ -20,25 +34,25 @@ pnpm template:promote-workflow -- --name sourceToBrief --description "Turns appr
 
 ## Files Created
 
-Generated workflows have two halves: `convex/workflows/<name>.ts` is the durable
-replay handler and `confect/workflows/<name>.{spec,impl}.ts` is the typed
-start/status/approval contract. React Flow remains a projection of durable graph
-data.
+Generated workflows have two halves: `convex/workflowRunners/<name>.ts` is the
+durable replay handler and `confect/workflowContracts/<name>.{spec,impl}.ts` is
+the typed start/status/approval contract. React Flow remains a projection of
+durable graph data.
 
 `template:add-workflow` writes:
 
-- `packages/convex/confect/workflows/<name>.spec.ts`;
-- `packages/convex/confect/workflows/<name>.impl.ts`;
+- `packages/convex/confect/workflowContracts/<name>.spec.ts`;
+- `packages/convex/confect/workflowContracts/<name>.impl.ts`;
 - `packages/convex/confect/workflows/<name>.graph.ts`;
-- `packages/convex/convex/workflows/<name>.ts`;
+- `packages/convex/convex/workflowRunners/<name>.ts`;
 - `packages/convex/test/<name>.workflow.test.ts`;
 - `docs/template/generated/workflows/<name>.md`.
 
 Generated approval nodes are only usable through the generated
-`workflows.<name>.approve` mutation, which checks workspace access before
-calling `sendEvent`. Generated capability nodes are only usable when their
-registry entries include a concrete `buildArgs` mapper for the target internal
-capability ref.
+`workflowContracts.<name>.approve` mutation, which checks workspace access
+before calling `sendEvent`. Generated capability nodes are only usable when
+their registry entries include a concrete `buildArgs` mapper for the target
+internal capability ref.
 
 Use `template:promote-workflow` only for older review artifacts or private
 package promotion flows that still need promotion into production-target paths.
@@ -56,6 +70,9 @@ package promotion flows that still need promotion into production-target paths.
 
 ## Gates
 
+- `pnpm --dir packages/convex exec convex codegen`
+- `pnpm --dir packages/convex typecheck`
+- `pnpm confect:codegen` when validating generated public workflow contract refs
 - `pnpm --dir packages/convex test workflows`
 - `pnpm --dir apps/web test src/features/workflows`
 - `pnpm check:workflow-graph-boundary`
