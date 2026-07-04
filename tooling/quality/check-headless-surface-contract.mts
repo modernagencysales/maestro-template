@@ -75,7 +75,7 @@ const objectMappingPattern = (
   mappedValue: string,
 ): RegExp =>
   new RegExp(
-    `\\b${objectName}\\b[\\s\\S]*?[\"'\`]${operationId}[\"'\`]\\s*:\\s*${mappedValue}`,
+    `\\b${objectName}\\b[\\s\\S]*?["'\`]${operationId}["'\`]\\s*:\\s*${mappedValue}`,
   );
 
 export const missingHttpGeneratedRefMapping = (
@@ -112,7 +112,7 @@ export const missingCliGeneratedRefUsage = (
       !objectMappingPattern(
         "generatedCliOperationRefs",
         operationId,
-        `[\"'\`]${operationId.replaceAll(".", "\\.")}[\"'\`]`,
+        `["'\`]${operationId.replaceAll(".", "\\.")}["'\`]`,
       ).test(source) || !usesGeneratedCliRefs,
   );
 };
@@ -133,7 +133,7 @@ export const missingMcpGeneratedRefUsage = (
       !objectMappingPattern(
         "generatedMcpOperationRefs",
         operationId,
-        `[\"'\`]template\\.${operationId.replaceAll(".", "\\.")}[\"'\`]`,
+        `["'\`]template\\.${operationId.replaceAll(".", "\\.")}["'\`]`,
       ).test(source) ||
       !usesGeneratedRefsForToolListing ||
       !usesGeneratedRefsForCallDispatch,
@@ -197,7 +197,6 @@ export const evaluateHeadlessSurfaceContract = async (
     httpSource,
     cliSource,
     workflowSource,
-    mcpSource,
     executorSource,
     httpTests,
     executorTests,
@@ -207,7 +206,6 @@ export const evaluateHeadlessSurfaceContract = async (
     readRepoFile(repoRoot, "packages/convex/confect/http.ts"),
     readRepoFile(repoRoot, "apps/cli/src/index.ts"),
     readRepoFile(repoRoot, "tooling/workflow/src/index.ts"),
-    readRepoFile(repoRoot, "packages/convex/confect/manifest/mcp.ts"),
     readRepoFile(repoRoot, "packages/convex/confect/manifest/executor.ts"),
     readRepoFile(repoRoot, "packages/convex/test/http-docs.test.ts"),
     readRepoFile(repoRoot, "packages/convex/test/headless-executor.test.ts"),

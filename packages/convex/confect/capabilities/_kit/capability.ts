@@ -54,6 +54,8 @@ export const collectContractManifest = (
       returnsSchema: _returnsSchema,
       ...serializable
     } = entry.manifest;
+    void _argsSchema;
+    void _returnsSchema;
     return serializable;
   });
 

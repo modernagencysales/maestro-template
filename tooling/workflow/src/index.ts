@@ -126,8 +126,9 @@ export type McpToolCallResult = {
 
 export const buildHeadlessOperations = (
   _registry?: TemplateRegistry,
-): readonly HeadlessOperation[] =>
-  confectManifest.functions.flatMap((entry) =>
+): readonly HeadlessOperation[] => {
+  void _registry;
+  return confectManifest.functions.flatMap((entry) =>
     entry.surfaces.map((surface) => ({
       id: `${surface}:${entry.operationId}`,
       surface,
@@ -138,6 +139,7 @@ export const buildHeadlessOperations = (
       typedErrors: entry.typedErrors,
     })),
   );
+};
 
 export const describeWorkflowTemplate = (registry?: TemplateRegistry) =>
   registry === undefined
@@ -159,8 +161,9 @@ export const getHeadlessOperation = (
 
 export const buildApiCatalog = (
   _registry?: TemplateRegistry,
-): readonly ApiCatalogEntry[] =>
-  confectManifest.functions
+): readonly ApiCatalogEntry[] => {
+  void _registry;
+  return confectManifest.functions
     .filter((entry) => hasSurface(entry, "api"))
     .map((entry) => ({
       operationId: entry.operationId,
@@ -169,6 +172,7 @@ export const buildApiCatalog = (
       authScope: "workspace member",
       typedErrors: entry.typedErrors,
     }));
+};
 
 const objectSchema: JsonSchema = {
   type: "object",
@@ -178,6 +182,7 @@ const objectSchema: JsonSchema = {
 export const buildGeneratedOpenApiDocument = (
   _registry?: TemplateRegistry,
 ): OpenApiDocument => {
+  void _registry;
   return {
     openapi: "3.1.0",
     info: {
@@ -280,8 +285,9 @@ export const runTemplateApiOperation = (
 
 export const buildGeneratedMcpTools = (
   _registry?: TemplateRegistry,
-): readonly McpToolEntry[] =>
-  confectManifest.functions
+): readonly McpToolEntry[] => {
+  void _registry;
+  return confectManifest.functions
     .filter((entry) => hasSurface(entry, "mcp"))
     .map((entry) => ({
       name:
@@ -291,6 +297,7 @@ export const buildGeneratedMcpTools = (
       inputSchema: mcpInputSchema,
       typedErrors: entry.typedErrors,
     }));
+};
 
 const mcpInputSchema: JsonSchema = {
   type: "object",

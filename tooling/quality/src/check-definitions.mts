@@ -615,6 +615,13 @@ export const checkDescriptors = {
           "durable workflow registry must not depend on React Flow runtime",
       },
       {
+        file: "tooling/workflow/src/index.ts",
+        includes: ["generatedMcpOperationRefs", "buildGeneratedMcpTools"],
+        absent: ["@xyflow/react", "ReactFlow"],
+        message:
+          "headless workflow projection entrypoint must not depend on React Flow runtime",
+      },
+      {
         file: "tooling/workflow/src/workflow-compat.ts",
         includes: ["createSampleWorkflowRunReceipt"],
         absent: ["@xyflow/react", "ReactFlow"],
