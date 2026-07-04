@@ -40,6 +40,7 @@ export const checkDescriptors = {
         file: ".buildkite/scripts/taste.sh",
         includes: [
           "OPENAI_API_KEY",
+          "TASTE_PROVIDER",
           "extract-ai-verdict.mts",
           "TASTE_REVIEW_WORKTREE",
           "TRUSTED_TREE",

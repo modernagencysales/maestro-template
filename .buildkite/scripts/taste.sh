@@ -20,6 +20,9 @@ fi
 
 # The reviewer itself also fails closed when no provider is configured.
 export TASTE_REQUIRE_AUTH=1
+if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+  export TASTE_PROVIDER="${TASTE_PROVIDER:-openai}"
+fi
 
 BASE_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-main}"
 git fetch origin "${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}" --depth=50 2>/dev/null || true
