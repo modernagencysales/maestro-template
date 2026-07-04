@@ -3,6 +3,7 @@ import * as Either from "effect/Either";
 
 import {
   acceptInvitation,
+  buildInvitationCreatedEvent,
   buildWorkspaceInvitation,
   cancelInvitation,
   changeMemberRole,
@@ -231,7 +232,7 @@ describe("workspace member lifecycle policy", () => {
 });
 
 describe("workspace invitation lifecycle policy", () => {
-  it("builds a normalized pending invitation with an audit event", () => {
+  it("builds a normalized pending invitation", () => {
     const either = buildWorkspaceInvitation({
       workspaceId: "workspaces_1",
       organizationId: "organizations_1",
@@ -252,16 +253,34 @@ describe("workspace invitation lifecycle policy", () => {
       status: "pending",
       expiresAt: now + 7 * 24 * 60 * 60 * 1000,
     });
-    expect(result.events).toEqual([
-      {
-        action: "invitation.created",
+  });
+
+  it("builds invitation-created events with the persisted invitation id", () => {
+    expect(
+      buildInvitationCreatedEvent({
+        id: "invitations_1",
         workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        subjectKind: "invitation",
-        subjectId: "token_hash",
-        metadata: { email: "ada@example.com", role: "editor" },
-      },
-    ]);
+        organizationId: "organizations_1",
+        email: "ada@example.com",
+        role: "editor",
+        status: "pending",
+        tokenHash: "token_hash",
+        invitedByUserId: "users_owner",
+        acceptedAt: null,
+        revokedAt: null,
+        declinedAt: null,
+        expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    ).toEqual({
+      action: "invitation.created",
+      workspaceId: "workspaces_1",
+      actorUserId: "users_owner",
+      subjectKind: "invitation",
+      subjectId: "invitations_1",
+      metadata: { email: "ada@example.com", role: "editor" },
+    });
   });
 
   it("opaque-denies missing, wrong-email, and blank-email invite access", () => {

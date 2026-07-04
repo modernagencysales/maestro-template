@@ -58,7 +58,6 @@ export const buildWorkspaceInvitation = (input: {
 }): PlannerResult<
   {
     readonly invitation: Omit<InvitationRef, "id">;
-    readonly events: readonly AccessLifecycleEvent[];
   },
   ValidationFailed
 > => {
@@ -82,18 +81,19 @@ export const buildWorkspaceInvitation = (input: {
 
   return succeed({
     invitation,
-    events: [
-      {
-        action: "invitation.created",
-        workspaceId: input.workspaceId,
-        actorUserId: input.invitedByUserId,
-        subjectKind: "invitation",
-        subjectId: input.tokenHash,
-        metadata: { email: email.right, role: input.role },
-      },
-    ],
   });
 };
+
+export const buildInvitationCreatedEvent = (
+  invitation: InvitationRef,
+): AccessLifecycleEvent => ({
+  action: "invitation.created",
+  workspaceId: invitation.workspaceId,
+  actorUserId: invitation.invitedByUserId,
+  subjectKind: "invitation",
+  subjectId: invitation.id,
+  metadata: { email: invitation.email, role: invitation.role },
+});
 
 export const acceptInvitation = (input: {
   readonly invitation: InvitationRef | null;

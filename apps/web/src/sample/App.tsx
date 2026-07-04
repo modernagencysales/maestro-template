@@ -56,7 +56,7 @@ const sampleNavigation = TEMPLATE_NAV_CATEGORIES.map((category) => ({
   })),
 }));
 const fallbackPageId = navItems[0]?.id ?? "overview";
-const pageIdFromHash = (hashValue: string) => {
+const resolvePageIdFromHash = (hashValue: string) => {
   const pageId = hashValue.replace(/^#/, "");
 
   return pageById.has(pageId) ? pageId : fallbackPageId;
@@ -84,14 +84,14 @@ export function App() {
   const [activePageId, setActivePageId] = useState<string>(() =>
     typeof window === "undefined"
       ? fallbackPageId
-      : pageIdFromHash(window.location.hash),
+      : resolvePageIdFromHash(window.location.hash),
   );
   const activePage = pageById.get(activePageId) ?? overviewPage;
   const activeRouteKey = pageIdToRouteKey.get(activePage.id) ?? "home";
 
   useEffect(() => {
     const handleHashChange = () => {
-      setActivePageId(pageIdFromHash(window.location.hash));
+      setActivePageId(resolvePageIdFromHash(window.location.hash));
     };
 
     window.addEventListener("hashchange", handleHashChange);

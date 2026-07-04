@@ -14,6 +14,7 @@ import { roleAtLeast, type Role } from "./roles";
 
 export {
   acceptInvitation,
+  buildInvitationCreatedEvent,
   buildWorkspaceInvitation,
   cancelInvitation,
   declineInvitation,
