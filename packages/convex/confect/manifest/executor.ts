@@ -135,6 +135,13 @@ const isJsonValue = (
   );
 };
 
+const isJsonRecord = (value: unknown): value is Record<string, JsonValue> =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  isPlainObject(value) &&
+  isJsonValue(value);
+
 export const executeHeadlessOperation = async (
   adapter: HeadlessExecutionAdapter,
   request: HeadlessExecutorRequest,
@@ -153,6 +160,13 @@ export const executeHeadlessOperation = async (
     );
   }
 
+  if (!isJsonRecord(request.input)) {
+    return failure(
+      "ValidationFailed",
+      `Operation ${operation.operationId} received non-JSON-safe input.`,
+    );
+  }
+
   const ref = adapter.refs[operation.operationId];
   if (!ref) {
     return failure(
@@ -166,11 +180,24 @@ export const executeHeadlessOperation = async (
       ? request.input
       : { ...request.input, idempotencyKey };
 
-  const result = await (operation.kind === "query"
-    ? adapter.runQuery(ref, input, operation)
-    : operation.kind === "mutation"
-      ? adapter.runMutation(ref, input, operation)
-      : adapter.runAction(ref, input, operation));
+  const operationKind: string = operation.kind;
+  let result: unknown;
+  switch (operationKind) {
+    case "query":
+      result = await adapter.runQuery(ref, input, operation);
+      break;
+    case "mutation":
+      result = await adapter.runMutation(ref, input, operation);
+      break;
+    case "action":
+      result = await adapter.runAction(ref, input, operation);
+      break;
+    default:
+      return failure(
+        "ValidationFailed",
+        `Operation ${operation.operationId} has unsupported kind ${operationKind}.`,
+      );
+  }
 
   if (!isJsonValue(result)) {
     return failure(

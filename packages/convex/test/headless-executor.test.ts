@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   executeHeadlessOperation,
   findHeadlessOperation,
@@ -112,4 +112,76 @@ describe("headless executor", () => {
       },
     });
   });
+
+  it("rejects non-JSON-safe request input before adapter execution", async () => {
+    const adapter = createAdapter({
+      runMutation: async () => {
+        throw new Error("runMutation should not be called");
+      },
+    });
+
+    await expect(
+      executeHeadlessOperation(adapter, {
+        operationId: "brain.pages.createMarkdown",
+        surface: "api",
+        input: { createdAt: new Date("2026-07-03T00:00:00.000Z") } as never,
+        idempotencyKey: "idem_123",
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        _tag: "ValidationFailed",
+        message:
+          "Operation brain.pages.createMarkdown received non-JSON-safe input.",
+      },
+    });
+  });
+
+  it("rejects unsupported manifest operation kinds instead of dispatching them as actions", async () => {
+    vi.resetModules();
+    vi.doMock(
+      "@maestro-template/template-core/generated/confectManifest",
+      () => ({
+        confectManifest: {
+          version: 1,
+          generatedAt: "1970-01-01T00:00:00.000Z",
+          functions: [
+            {
+              namespace: "brain.pages",
+              name: "createMarkdown",
+              operationId: "brain.pages.createMarkdown",
+              kind: "future",
+              surfaces: ["api"],
+              typedErrors: [],
+              idempotent: true,
+              argsSchemaName: "brain.pages.createMarkdown.args",
+              returnsSchemaName: "brain.pages.createMarkdown.returns",
+            },
+          ],
+        },
+      }),
+    );
+
+    const { executeHeadlessOperation: executeWithMockedManifest } =
+      await import("../confect/manifest/executor");
+
+    await expect(
+      executeWithMockedManifest(createAdapter(), {
+        operationId: "brain.pages.createMarkdown",
+        surface: "api",
+        input: {},
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        _tag: "ValidationFailed",
+        message:
+          "Operation brain.pages.createMarkdown has unsupported kind future.",
+      },
+    });
+  });
+});
+
+afterEach(() => {
+  vi.doUnmock("@maestro-template/template-core/generated/confectManifest");
 });
