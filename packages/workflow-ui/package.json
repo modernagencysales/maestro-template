@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.tsx",
       "default": "./dist/src/index.js"
+    },
+    "./workflowCanvasState": {
+      "types": "./src/workflowCanvasState.ts",
+      "default": "./dist/src/workflowCanvasState.js"
     }
   },
   "scripts": {

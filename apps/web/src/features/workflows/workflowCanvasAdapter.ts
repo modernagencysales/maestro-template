@@ -7,7 +7,7 @@ import {
   type WorkflowStageKeyMap,
   type WorkflowStageRunForCanvas,
   type WorkflowValidationHint,
-} from "@maestro-template/workflow-ui";
+} from "@maestro-template/workflow-ui/workflowCanvasState";
 
 export type WorkflowCanvasAdapterInput = {
   readonly graph: DurableWorkflowGraphForCanvas | undefined;
