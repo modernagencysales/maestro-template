@@ -608,10 +608,26 @@ describe("template app factory generators", () => {
     expect(generated.files[2]?.content).toContain(
       "normalizeSummarizeSourceInput",
     );
+    expect(generated.files[1]?.content).toContain(
+      'import summarizeSourceGroup from "./summarizeSource.spec"',
+    );
+    expect(generated.files[1]?.content).not.toContain(", { summarizeSource }");
     expect(generated.files[3]?.content).toContain(
       'import fc from "fast-check"',
     );
     expect(generated.files[3]?.content).toContain("fc.assert");
+    expect(generated.files[3]?.content).toContain(
+      'import metadata from "./summarizeSource.headless.json"',
+    );
+    expect(generated.files[3]?.content).not.toContain(
+      "JSON.stringify(typedErrors)",
+    );
+    expect(generated.files[3]?.content).not.toContain(
+      'expect(["Unauthorized","ValidationFailed","Forbidden"])',
+    );
+    expect(generated.files[3]?.content).toContain("metadata.typedErrors");
+    expect(generated.files[3]?.content).toContain("summarizeSourceArgs");
+    expect(generated.files[3]?.content).toContain("summarizeSourceReturns");
     expect(generated.files[4]?.content).toContain('"surfaces"');
     expect(JSON.parse(generated.files[4]?.content ?? "{}")).toMatchObject({
       requiredFiles: expect.arrayContaining([
@@ -755,11 +771,27 @@ describe("template app factory generators", () => {
     expect(promoted.files[1]?.content).toContain(
       'import databaseSchema from "../_generated/schema"',
     );
+    expect(promoted.files[1]?.content).toContain(
+      'import summarizeSourceGroup from "./summarizeSource.spec"',
+    );
+    expect(promoted.files[1]?.content).not.toContain(", { summarizeSource }");
     expect(promoted.files[2]?.content).toContain(
       "normalizeSummarizeSourceInput",
     );
     expect(promoted.files[3]?.content).toContain('import fc from "fast-check"');
     expect(promoted.files[3]?.content).toContain("fc.assert");
+    expect(promoted.files[3]?.content).toContain(
+      'import metadata from "./summarizeSource.headless.json"',
+    );
+    expect(promoted.files[3]?.content).not.toContain(
+      "JSON.stringify(typedErrors)",
+    );
+    expect(promoted.files[3]?.content).not.toContain(
+      'expect(["Unauthorized","ValidationFailed","Forbidden"])',
+    );
+    expect(promoted.files[3]?.content).toContain("metadata.typedErrors");
+    expect(promoted.files[3]?.content).toContain("summarizeSourceArgs");
+    expect(promoted.files[3]?.content).toContain("summarizeSourceReturns");
     expect(JSON.parse(promoted.files[4]?.content ?? "{}")).toMatchObject({
       migrationNotes: expect.arrayContaining([
         "Run Confect codegen before wiring generated refs.",

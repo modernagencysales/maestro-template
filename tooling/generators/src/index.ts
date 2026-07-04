@@ -1057,7 +1057,7 @@ export default GroupSpec.make().addFunction(${name});
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
-import ${name}Group, { ${name} } from "./${name}.spec";
+import ${name}Group from "./${name}.spec";
 
 const ${name}Impl = FunctionImpl.make(databaseSchema, ${name}Group, "${name}", () =>
   Effect.succeed({
@@ -1110,6 +1110,7 @@ export const validate${pascalName}Input = (
       path: `${basePath}.test.ts`,
       content: `import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import metadata from "./${name}.headless.json";
 import {
   normalize${pascalName}Input,
   validate${pascalName}Input,
@@ -1148,7 +1149,13 @@ describe("${name} generated capability domain", () => {
   });
 
   it("declares the required typed errors", () => {
-    expect(${JSON.stringify(typedErrors)}).toContain("ValidationFailed");
+    expect(metadata.typedErrors).toEqual(
+      expect.arrayContaining(["Unauthorized", "ValidationFailed", "Forbidden"]),
+    );
+    expect(metadata.schemas).toEqual({
+      args: "${name}Args",
+      returns: "${name}Returns",
+    });
   });
 });
 `,
@@ -1162,6 +1169,10 @@ describe("${name} generated capability domain", () => {
           exposure,
           authScope: "workspace member",
           typedErrors,
+          schemas: {
+            args: `${name}Args`,
+            returns: `${name}Returns`,
+          },
           surfaces:
             exposure === "headless" ? ["api", "cli", "mcp"] : [exposure],
           requiredFiles: [
@@ -1379,7 +1390,7 @@ export default GroupSpec.make().addFunction(${name});
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
-import ${name}Group, { ${name} } from "./${name}.spec";
+import ${name}Group from "./${name}.spec";
 
 const ${name}Impl = FunctionImpl.make(
   databaseSchema,
@@ -1436,6 +1447,7 @@ export const validate${pascalName}Input = (
       path: `${basePath}.test.ts`,
       content: `import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import metadata from "./${name}.headless.json";
 import {
   normalize${pascalName}Input,
   validate${pascalName}Input,
@@ -1474,11 +1486,13 @@ describe("${name} promoted capability domain", () => {
   });
 
   it("declares the required typed errors", () => {
-    expect(${JSON.stringify([
-      "Unauthorized",
-      "ValidationFailed",
-      "Forbidden",
-    ])}).toContain("ValidationFailed");
+    expect(metadata.typedErrors).toEqual(
+      expect.arrayContaining(["Unauthorized", "ValidationFailed", "Forbidden"]),
+    );
+    expect(metadata.schemas).toEqual({
+      args: "${name}Args",
+      returns: "${name}Returns",
+    });
   });
 });
 `,
@@ -1492,6 +1506,10 @@ describe("${name} promoted capability domain", () => {
           targetGroup: `capabilities/${name}`,
           authScope: "workspace member",
           typedErrors: ["Unauthorized", "ValidationFailed", "Forbidden"],
+          schemas: {
+            args: `${name}Args`,
+            returns: `${name}Returns`,
+          },
           surfaces: ["api", "cli", "mcp"],
           migrationNotes: [
             "Run Confect codegen before wiring generated refs.",
