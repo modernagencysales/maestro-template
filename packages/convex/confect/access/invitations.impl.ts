@@ -1,5 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
+import * as Clock from "effect/Clock";
 import type * as Context from "effect/Context";
 import * as Either from "effect/Either";
 import * as Effect from "effect/Effect";
@@ -33,7 +34,7 @@ const create = FunctionImpl.make(
   "create",
   ({ workspaceId, email, role }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
@@ -75,7 +76,7 @@ const accept = FunctionImpl.make(
   "accept",
   ({ invitationId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
@@ -127,7 +128,7 @@ const decline = FunctionImpl.make(
   "decline",
   ({ invitationId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
@@ -157,7 +158,7 @@ const cancel = FunctionImpl.make(
   "cancel",
   ({ invitationId, workspaceId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const actor = yield* loadActorForWorkspace(reader, workspaceId);

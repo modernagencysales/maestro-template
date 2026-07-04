@@ -23,8 +23,6 @@ contract family.
 
 - `brain/pages` declares only `WorkspaceNotFound` and does not enforce active
   workspace membership before reads or writes.
-- Several database-backed impls call `Date.now()` directly instead of using
-  Effect `Clock.currentTimeMillis`.
 - Headless API/CLI/MCP projections still derive from the canned
   `templateRegistry`, not generated Confect contract metadata.
 - Generator draft and promotion output disagree on layout and still emit some
@@ -81,5 +79,6 @@ inspect the generated diff, and prove no stale generated output remains.
 
 Add one row per completed phase.
 
-| Date | Phase | Command | Result |
-| ---- | ----- | ------- | ------ |
+| Date       | Phase       | Command                                             | Result                                                                                             |
+| ---------- | ----------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 2026-07-04 | B / Task 11 | `rtk rg -n "Date\\.now\\(" packages/convex/confect` | Database-backed impls use Effect `Clock.currentTimeMillis`; no demo fixture time constants remain. |

@@ -1,5 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
+import * as Clock from "effect/Clock";
 import type * as Context from "effect/Context";
 import * as Either from "effect/Either";
 import * as Effect from "effect/Effect";
@@ -27,7 +28,7 @@ const changeRole = FunctionImpl.make(
   "changeRole",
   ({ membershipId, newRole }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
@@ -64,7 +65,7 @@ const remove = FunctionImpl.make(
   "remove",
   ({ membershipId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);
@@ -100,7 +101,7 @@ const transferOwnershipImpl = FunctionImpl.make(
   "transferOwnership",
   ({ membershipId }) =>
     Effect.gen(function* () {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const target = yield* loadMember(reader, membershipId);

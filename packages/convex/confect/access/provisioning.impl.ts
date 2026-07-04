@@ -1,5 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -30,7 +31,7 @@ const ensureProvisioned = FunctionImpl.make(
           Effect.mapError(() => new Unauthorized()),
         ),
       );
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
 
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
