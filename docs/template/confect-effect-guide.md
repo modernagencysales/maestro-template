@@ -152,3 +152,11 @@ aggregate Confect entrypoints, no `effect` barrel imports under
 `FunctionSpec` object literals, generated `databaseSchema` usage plus
 `GroupImpl.finalize` in impls, and lazy table default exports without table-name
 arguments.
+
+## Effectified-Full Primitives
+
+Reusable primitives follow `docs/template/primitive-contract.md`. A primitive is
+not considered template-ready when it only has a Confect function. It also needs
+the pure domain boundary, typed errors, service boundaries, manifest metadata,
+workflow-step eligibility when dispatchable, frontend state when visible, tests,
+gates, and docs.
