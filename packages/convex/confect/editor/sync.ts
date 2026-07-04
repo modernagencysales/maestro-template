@@ -1,4 +1,12 @@
 import type { GenericMutationCtx, GenericQueryCtx } from "convex/server";
+import {
+  resolveEffectiveWorkspaceRole,
+  type OrganizationMemberRef,
+  type OrganizationRef,
+  type WorkspaceMemberRef,
+  type WorkspaceRef,
+} from "../access/auth";
+import { roleAtLeast } from "../access/roles";
 import type { DataModel } from "../../convex/_generated/dataModel";
 import { parseEditorTarget } from "./documentTargets";
 
@@ -41,24 +49,72 @@ export const requireEditorDocumentAccess = async (
   if (user === null) {
     throw new Error("Editor sync requires a provisioned user.");
   }
+  if (user.status !== "active") {
+    throw new Error("Editor sync requires an active user.");
+  }
 
-  const member = await ctx.db
+  const workspace = await ctx.db.normalizeId("workspaces", workspaceId);
+  if (workspace === null) {
+    throw new Error("Editor sync requires an active workspace.");
+  }
+  const workspaceRow = await ctx.db.get(workspace);
+  if (workspaceRow === null) {
+    throw new Error("Editor sync requires an active workspace.");
+  }
+
+  const organizationId = ctx.db.normalizeId(
+    "organizations",
+    workspaceRow.organizationId,
+  );
+  if (organizationId === null) {
+    throw new Error("Editor sync requires an active organization.");
+  }
+  const organization = await ctx.db.get(organizationId);
+  if (organization === null) {
+    throw new Error("Editor sync requires an active organization.");
+  }
+
+  const workspaceMembers = await ctx.db
     .query("workspaceMembers")
     .withIndex("by_workspace_user", (q) =>
       q.eq("workspaceId", workspaceId).eq("userId", user._id),
     )
-    .unique();
+    .collect();
+  const organizationMembers = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_organization_user", (q) =>
+      q
+        .eq("organizationId", workspaceRow.organizationId)
+        .eq("userId", user._id),
+    )
+    .collect();
 
-  if (member === null || member.status !== "active") {
+  const resolution = resolveEffectiveWorkspaceRole({
+    nowMs: Date.now(),
+    userId: user._id,
+    workspace: {
+      id: workspaceRow._id,
+      organizationId: workspaceRow.organizationId,
+      status: workspaceRow.status,
+    } satisfies WorkspaceRef,
+    organization: {
+      id: organization._id,
+      status: organization.status,
+    } satisfies OrganizationRef,
+    workspaceMembers: workspaceMembers as WorkspaceMemberRef[],
+    organizationMembers: organizationMembers as OrganizationMemberRef[],
+    guestGrants: [],
+  });
+
+  if (!resolution.ok) {
     throw new Error("Editor sync requires workspace membership.");
   }
 
-  if (
-    role === "editor" &&
-    member.role !== "owner" &&
-    member.role !== "admin" &&
-    member.role !== "editor"
-  ) {
-    throw new Error("Editor sync requires editor access.");
+  if (!roleAtLeast(resolution.role, role)) {
+    throw new Error(
+      role === "editor"
+        ? "Editor sync requires editor access."
+        : "Editor sync requires workspace membership.",
+    );
   }
 };

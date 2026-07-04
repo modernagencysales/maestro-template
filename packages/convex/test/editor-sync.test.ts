@@ -31,7 +31,9 @@ const makeIndexQuery = (table: string, doc: unknown, calls: IndexCall[]) => ({
     };
     build(q);
     calls.push({ table, index, eqs });
+    const docs = Array.isArray(doc) ? doc : doc === null ? [] : [doc];
     return {
+      collect: vi.fn(async () => docs),
       unique: vi.fn(async () => doc),
     };
   }),
@@ -43,12 +45,37 @@ type QueryEq = {
 
 const makeAuthCtx = ({
   identity = { subject: "subject_1" },
-  user = { _id: "user_1" },
-  member = { status: "active", role: "editor" },
+  user = { _id: "user_1", status: "active" },
+  page = { _id: "page_1", workspaceId: "workspace_1" },
+  workspace = {
+    _id: "workspace_1",
+    id: "workspace_1",
+    organizationId: "organization_1",
+    status: "active",
+  },
+  organization = {
+    _id: "organization_1",
+    id: "organization_1",
+    status: "active",
+  },
+  member = {
+    workspaceId: "workspace_1",
+    userId: "user_1",
+    status: "active",
+    role: "editor",
+    acceptedAt: 1,
+    revokedAt: null,
+    deletedAt: null,
+  },
+  organizationMember = null,
 }: {
   readonly identity?: { readonly subject: string } | null;
   readonly user?: unknown;
+  readonly page?: unknown;
+  readonly workspace?: unknown;
+  readonly organization?: unknown;
   readonly member?: unknown;
+  readonly organizationMember?: unknown;
 } = {}) => {
   const indexCalls: IndexCall[] = [];
   const ctx = {
@@ -56,12 +83,28 @@ const makeAuthCtx = ({
       getUserIdentity: vi.fn(async () => identity),
     },
     db: {
-      normalizeId: vi.fn(() => "page_1"),
-      get: vi.fn(async () => ({ _id: "page_1", workspaceId: "workspace_1" })),
+      normalizeId: vi.fn((_table: string, id: string) => id),
+      get: vi.fn(async (id: string) => {
+        if (id === "page_1") return page;
+        if (id === "workspace_1") return workspace;
+        if (id === "organization_1") return organization;
+        return null;
+      }),
       query: vi.fn((table: string) => {
         if (table === "users") return makeIndexQuery(table, user, indexCalls);
         if (table === "workspaceMembers") {
-          return makeIndexQuery(table, member, indexCalls);
+          return makeIndexQuery(
+            table,
+            member === null ? [] : [member],
+            indexCalls,
+          );
+        }
+        if (table === "organizationMembers") {
+          return makeIndexQuery(
+            table,
+            organizationMember === null ? [] : [organizationMember],
+            indexCalls,
+          );
         }
         throw new Error(`Unexpected table ${table}`);
       }),
@@ -121,7 +164,94 @@ describe("editor sync registration", () => {
           ["userId", "user_1"],
         ],
       },
+      {
+        table: "organizationMembers",
+        index: "by_organization_user",
+        eqs: [
+          ["organizationId", "organization_1"],
+          ["userId", "user_1"],
+        ],
+      },
     ]);
+  });
+
+  it("rejects inactive users", async () => {
+    const { ctx } = makeAuthCtx({
+      user: { _id: "user_1", status: "suspended" },
+    });
+
+    await expect(
+      requireEditorDocumentAccess(ctx, "brainPage:page_1", "viewer"),
+    ).rejects.toThrow("active user");
+  });
+
+  it("rejects lifecycle-invalid direct workspace memberships", async () => {
+    for (const member of [
+      {
+        workspaceId: "workspace_1",
+        userId: "user_1",
+        status: "pending",
+        role: "editor",
+        acceptedAt: null,
+        revokedAt: null,
+        deletedAt: null,
+      },
+      {
+        workspaceId: "workspace_1",
+        userId: "user_1",
+        status: "active",
+        role: "editor",
+        acceptedAt: 1,
+        revokedAt: 2,
+        deletedAt: null,
+      },
+      {
+        workspaceId: "workspace_1",
+        userId: "user_1",
+        status: "active",
+        role: "editor",
+        acceptedAt: 1,
+        revokedAt: null,
+        deletedAt: 3,
+      },
+    ]) {
+      const { ctx } = makeAuthCtx({ member });
+
+      await expect(
+        requireEditorDocumentAccess(ctx, "brainPage:page_1", "viewer"),
+      ).rejects.toThrow("workspace membership");
+    }
+  });
+
+  it("rejects archived workspaces and inactive organizations", async () => {
+    await expect(
+      requireEditorDocumentAccess(
+        makeAuthCtx({
+          workspace: {
+            _id: "workspace_1",
+            id: "workspace_1",
+            organizationId: "organization_1",
+            status: "archived",
+          },
+        }).ctx,
+        "brainPage:page_1",
+        "viewer",
+      ),
+    ).rejects.toThrow("workspace membership");
+
+    await expect(
+      requireEditorDocumentAccess(
+        makeAuthCtx({
+          organization: {
+            _id: "organization_1",
+            id: "organization_1",
+            status: "suspended",
+          },
+        }).ctx,
+        "brainPage:page_1",
+        "viewer",
+      ),
+    ).rejects.toThrow("workspace membership");
   });
 
   it("records Brain page snapshots through the internal mirror mutation", async () => {
