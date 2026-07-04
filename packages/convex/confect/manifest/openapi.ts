@@ -16,6 +16,26 @@ const openApiRequestSchemaFor = (schemaName: string): unknown => {
   return schema;
 };
 
+const envelopeSchemaFor = (
+  entry: (typeof confectManifest.functions)[number],
+) => {
+  const required = ["input"];
+  if (!entry.idempotent) {
+    required.push("idempotencyKey");
+  }
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    required,
+    properties: {
+      workspaceSlug: { type: "string" },
+      input: openApiRequestSchemaFor(entry.argsSchemaName),
+      idempotencyKey: { type: "string" },
+    },
+  };
+};
+
 export const buildGeneratedOpenApiDocument = () => ({
   openapi: "3.1.0" as const,
   info: {
@@ -37,7 +57,7 @@ export const buildGeneratedOpenApiDocument = () => ({
               required: true,
               content: {
                 "application/json": {
-                  schema: openApiRequestSchemaFor(entry.argsSchemaName),
+                  schema: envelopeSchemaFor(entry),
                 },
               },
             },

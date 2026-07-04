@@ -71,7 +71,13 @@ describe("workflow headless registry", () => {
         "Invoke brain.pages.createMarkdown through the generated Confect contract manifest.",
       inputSchema: expect.objectContaining({
         type: "object",
-        additionalProperties: true,
+        required: ["workspaceId", "slug", "title", "markdown"],
+        properties: expect.objectContaining({
+          workspaceId: { type: "string" },
+          slug: { type: "string" },
+          title: { type: "string" },
+          markdown: { type: "string" },
+        }),
       }),
       typedErrors: [
         "Unauthorized",
@@ -129,7 +135,15 @@ describe("workflow headless registry", () => {
           "application/json": {
             schema: {
               type: "object",
-              additionalProperties: true,
+              additionalProperties: false,
+              required: ["input", "idempotencyKey"],
+              properties: {
+                input: expect.objectContaining({
+                  type: "object",
+                  required: ["workspaceId", "slug", "title", "markdown"],
+                }),
+                idempotencyKey: { type: "string" },
+              },
             },
           },
         },

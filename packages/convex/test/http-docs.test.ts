@@ -89,7 +89,15 @@ describe("template HTTP docs routes", () => {
                 "application/json": {
                   schema: {
                     type: "object",
-                    required: ["workspaceId", "slug", "title", "markdown"],
+                    additionalProperties: false,
+                    required: ["input", "idempotencyKey"],
+                    properties: {
+                      input: {
+                        type: "object",
+                        required: ["workspaceId", "slug", "title", "markdown"],
+                      },
+                      idempotencyKey: { type: "string" },
+                    },
                   },
                 },
               },
@@ -206,6 +214,52 @@ describe("template HTTP docs routes", () => {
         title: "A note",
         markdown: "# A note",
         idempotencyKey: "brain-page-example-001",
+      },
+    ]);
+  });
+
+  it("executes the documented OpenAPI request envelope", async () => {
+    const calls: unknown[] = [];
+    const ctx: HeadlessHttpCtx = {
+      ...noopCtx,
+      runMutation: async (ref, input) => {
+        calls.push([ref, input]);
+        return { id: "brainPage_456", source: "openapi-envelope" };
+      },
+    };
+    const response = await handleTemplateHttpRequest(
+      ctx,
+      new Request("https://template.local/api/brain.pages.createMarkdown", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          input: {
+            workspaceId: "workspace_openapi",
+            slug: "openapi-note",
+            title: "OpenAPI note",
+            markdown: "# OpenAPI note",
+          },
+          idempotencyKey: "openapi-envelope-001",
+        }),
+      }),
+    );
+
+    expect(await readJson(response)).toMatchObject({
+      ok: true,
+      operationId: "brain.pages.createMarkdown",
+      result: {
+        id: "brainPage_456",
+        source: "openapi-envelope",
+      },
+    });
+    expect(calls[0]).toMatchObject([
+      expect.anything(),
+      {
+        workspaceId: "workspace_openapi",
+        slug: "openapi-note",
+        title: "OpenAPI note",
+        markdown: "# OpenAPI note",
+        idempotencyKey: "openapi-envelope-001",
       },
     ]);
   });

@@ -2,7 +2,10 @@ import {
   type TemplateRegistry,
   type WorkflowRunReceipt,
 } from "@maestro-template/template-core";
-import { confectManifest } from "@maestro-template/template-core/generated/confectManifest";
+import {
+  confectJsonSchemas,
+  confectManifest,
+} from "@maestro-template/template-core/generated/confectManifest";
 import {
   describeDefaultWorkflow,
   describeWorkflowRegistry,
@@ -174,9 +177,46 @@ export const buildApiCatalog = (
     }));
 };
 
-const objectSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: true,
+const openApiRequestSchemaFor = (schemaName: string): JsonSchema => {
+  const schema =
+    confectJsonSchemas.openApi31[
+      schemaName as keyof typeof confectJsonSchemas.openApi31
+    ];
+
+  if (schema === undefined) {
+    throw new Error(`Missing OpenAPI JSON schema for ${schemaName}.`);
+  }
+
+  return schema as JsonSchema;
+};
+
+const mcpInputSchemaFor = (schemaName: string): JsonSchema => {
+  const schema =
+    confectJsonSchemas.mcp[schemaName as keyof typeof confectJsonSchemas.mcp];
+
+  if (schema === undefined) {
+    throw new Error(`Missing MCP JSON schema for ${schemaName}.`);
+  }
+
+  return schema as JsonSchema;
+};
+
+const apiEnvelopeSchemaFor = (entry: ManifestFunction): JsonSchema => {
+  const required = ["input"];
+  if (!entry.idempotent) {
+    required.push("idempotencyKey");
+  }
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    required,
+    properties: {
+      workspaceSlug: { type: "string" },
+      input: openApiRequestSchemaFor(entry.argsSchemaName),
+      idempotencyKey: { type: "string" },
+    },
+  };
 };
 
 export const buildGeneratedOpenApiDocument = (
@@ -204,7 +244,7 @@ export const buildGeneratedOpenApiDocument = (
                 required: true,
                 content: {
                   "application/json": {
-                    schema: objectSchema,
+                    schema: apiEnvelopeSchemaFor(entry),
                   },
                 },
               },
@@ -294,14 +334,9 @@ export const buildGeneratedMcpTools = (
         generatedMcpOperationRefs[entry.operationId] ??
         `template.${entry.operationId}`,
       description: `Invoke ${entry.operationId} through the generated Confect contract manifest.`,
-      inputSchema: mcpInputSchema,
+      inputSchema: mcpInputSchemaFor(entry.argsSchemaName),
       typedErrors: entry.typedErrors,
     }));
-};
-
-const mcpInputSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: true,
 };
 
 const workflowRunMcpTool: McpToolEntry = {
