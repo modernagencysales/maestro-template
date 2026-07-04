@@ -1,6 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
 import type * as Context from "effect/Context";
+import * as Either from "effect/Either";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -36,15 +37,17 @@ const changeRole = FunctionImpl.make(
         reader,
         target.workspaceId,
       );
-      const plan = changeMemberRole({
-        actorUserId: actor.userId,
-        actorRole: actor.role,
-        workspaceId: target.workspaceId,
-        target,
-        liveWorkspaceMembers: liveMembers,
-        newRole,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        changeMemberRole({
+          actorUserId: actor.userId,
+          actorRole: actor.role,
+          workspaceId: target.workspaceId,
+          target,
+          liveWorkspaceMembers: liveMembers,
+          newRole,
+          now,
+        }),
+      );
 
       yield* writer
         .table("workspaceMembers")
@@ -71,14 +74,16 @@ const remove = FunctionImpl.make(
         reader,
         target.workspaceId,
       );
-      const plan = removeMember({
-        actorUserId: actor.userId,
-        actorRole: actor.role,
-        workspaceId: target.workspaceId,
-        target,
-        liveWorkspaceMembers: liveMembers,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        removeMember({
+          actorUserId: actor.userId,
+          actorRole: actor.role,
+          workspaceId: target.workspaceId,
+          target,
+          liveWorkspaceMembers: liveMembers,
+          now,
+        }),
+      );
 
       yield* writer
         .table("workspaceMembers")
@@ -106,13 +111,15 @@ const transferOwnershipImpl = FunctionImpl.make(
         target.workspaceId,
         actor.userId,
       );
-      const plan = transferOwnership({
-        actorUserId: actor.userId,
-        workspaceId: target.workspaceId,
-        target,
-        actorMembership,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        transferOwnership({
+          actorUserId: actor.userId,
+          workspaceId: target.workspaceId,
+          target,
+          actorMembership,
+          now,
+        }),
+      );
 
       yield* Effect.forEach(plan.patches, (patch) =>
         writer
@@ -126,6 +133,11 @@ const transferOwnershipImpl = FunctionImpl.make(
 );
 
 type Reader = Context.Tag.Service<typeof DatabaseReader>;
+
+const fromPlanner = <A, E>(result: Either.Either<A, E>): Effect.Effect<A, E> =>
+  Either.isLeft(result)
+    ? Effect.fail(result.left)
+    : Effect.succeed(result.right);
 
 const loadCurrentUser = (reader: Reader) =>
   Effect.gen(function* () {

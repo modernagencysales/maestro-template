@@ -1,6 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
 import type * as Context from "effect/Context";
+import * as Either from "effect/Either";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -49,15 +50,17 @@ const create = FunctionImpl.make(
           now,
         }),
       );
-      const plan = buildWorkspaceInvitation({
-        workspaceId,
-        organizationId: workspace.organizationId,
-        inviteeEmail: email,
-        role,
-        invitedByUserId: actor.userId,
-        tokenHash,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        buildWorkspaceInvitation({
+          workspaceId,
+          organizationId: workspace.organizationId,
+          inviteeEmail: email,
+          role,
+          invitedByUserId: actor.userId,
+          tokenHash,
+          now,
+        }),
+      );
 
       return yield* writer
         .table("invitations")
@@ -85,13 +88,15 @@ const accept = FunctionImpl.make(
               invitation.workspaceId,
               user._id,
             );
-      const plan = acceptInvitation({
-        invitation,
-        verifiedEmail: user.email,
-        userId: user._id,
-        existingLiveMembership,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        acceptInvitation({
+          invitation,
+          verifiedEmail: user.email,
+          userId: user._id,
+          existingLiveMembership,
+          now,
+        }),
+      );
       const acceptedInvitation = requireLoadedInvitation(invitation);
 
       yield* writer
@@ -127,11 +132,13 @@ const decline = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
       const user = yield* loadCurrentUser(reader);
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
-      const plan = declineInvitation({
-        invitation,
-        verifiedEmail: user.email,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        declineInvitation({
+          invitation,
+          verifiedEmail: user.email,
+          now,
+        }),
+      );
 
       if (plan.invitationPatch !== null) {
         yield* writer
@@ -156,12 +163,14 @@ const cancel = FunctionImpl.make(
       const actor = yield* loadActorForWorkspace(reader, workspaceId);
       requireActorRole(actor, "admin");
       const invitation = yield* loadInvitationForResponse(reader, invitationId);
-      const plan = cancelInvitation({
-        invitation,
-        workspaceId,
-        actorUserId: actor.userId,
-        now,
-      });
+      const plan = yield* fromPlanner(
+        cancelInvitation({
+          invitation,
+          workspaceId,
+          actorUserId: actor.userId,
+          now,
+        }),
+      );
 
       if (plan.invitationPatch !== null) {
         yield* writer
@@ -175,6 +184,11 @@ const cancel = FunctionImpl.make(
 );
 
 type Reader = Context.Tag.Service<typeof DatabaseReader>;
+
+const fromPlanner = <A, E>(result: Either.Either<A, E>): Effect.Effect<A, E> =>
+  Either.isLeft(result)
+    ? Effect.fail(result.left)
+    : Effect.succeed(result.right);
 
 const loadCurrentUser = (reader: Reader) =>
   Effect.gen(function* () {
