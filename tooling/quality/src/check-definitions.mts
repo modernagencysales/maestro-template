@@ -304,8 +304,10 @@ export const checkDescriptors = {
           "Confect spec/impl",
           "Effect schema",
           "typed errors",
-          "headless registry entry",
+          "generated manifest/headless metadata",
+          "explicit generated ref mappings",
         ],
+        absent: ["headless registry entry"],
         message: "generator output contract must protect generated slices",
       },
       {
