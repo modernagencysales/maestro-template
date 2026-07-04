@@ -23,6 +23,14 @@ React Flow owns canvas interaction only: drag/drop, selection, viewport,
 palette, draft commands, and visual validation hints. Durable graph schemas,
 validation, and execution live outside React Flow packages.
 
+## Canvas Boundary
+
+The workflow canvas is a projection of durable workflow graph data. Persisted
+workflow records store the graph contract and stage/event ledgers. The web app
+derives React Flow nodes and edges from that graph, overlays
+`workflowStageRuns`, and saves domain workflow commands rather than raw React
+Flow mutations.
+
 ## Durable Graph Runner Semantics
 
 The persisted `DurableWorkflowGraph` is the source of truth. React Flow and

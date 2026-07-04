@@ -215,6 +215,19 @@ construct provider clients inside route components.
 - Validation hints are overlays derived from graph validation results.
 - Reduced-motion mode disables nonessential canvas animation.
 
+## Workflow Canvas State
+
+`packages/workflow-ui/src/workflowCanvasState.ts` is the reusable workflow
+canvas primitive. It converts durable workflow graph data into loading, empty,
+and ready canvas states and overlays latest stage attempts onto nodes. It has no
+React, Convex, Confect, Effect runtime, or generated-ref imports.
+
+`packages/workflow-ui/src/index.tsx` renders the pure model with React Flow.
+`apps/web/src/features/workflows/workflowCanvasAdapter.ts` is the app boundary
+that combines a graph source with live stage rows. React Flow interactions must
+emit workflow graph commands; React Flow node/edge objects are not persisted as
+the source of truth.
+
 ## Migration Acceptance Criteria
 
 Before the TanStack Start runtime replaces the current static app path:
