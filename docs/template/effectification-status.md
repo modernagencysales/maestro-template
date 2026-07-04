@@ -32,8 +32,9 @@ contract family.
   the root `package.json` does not expose that script yet.
 - The optional BlockNote/Tiptap/ProseMirror substrate is not vendored into the
   template as exact-pinned generic packages.
-- Manifest generation must become contract-bound; manual manifest arrays are a
-  temporary bootstrap only and must be cross-checked against generated refs.
+- The initial manifest generator starts with explicit operation metadata for the
+  first migrated group; Task 16 removes this bootstrap list by reading
+  capability builder metadata.
 - Runtime headless execution must call real generated refs before any API, CLI,
   or MCP surface is treated as production-ready.
 - Workflow graph execution semantics must be defined before porting Maestro
