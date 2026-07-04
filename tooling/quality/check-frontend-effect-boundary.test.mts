@@ -111,4 +111,16 @@ describe("check:frontend-effect-boundary", () => {
       }),
     );
   });
+
+  it("allows Effect Atom imports behind approved frontend adapter prefixes", async () => {
+    const result = await evaluateFixture({
+      "packages/frontend-effect/index.ts": `
+        import { Atom } from "@effect-atom/atom-react";
+
+        export const atom = Atom.make("approved adapter boundary");
+      `,
+    });
+
+    expect(result).toEqual({ ok: true, findings: [] });
+  });
 });
