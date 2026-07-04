@@ -161,6 +161,18 @@ describe("maestro-template CLI", () => {
     });
   });
 
+  it("parses workflow args after the workflow run subcommand", () => {
+    expect(
+      JSON.parse(
+        runCli(["workflow", "run", "--idempotency-key", "workflow-slice"])
+          .stdout,
+      ),
+    ).toMatchObject({
+      runId: "run_workflow-slice",
+      idempotencyKey: "workflow-slice",
+    });
+  });
+
   it("uses workflow run args when provided", () => {
     const receipt = JSON.parse(
       runCli([
@@ -296,6 +308,31 @@ describe("maestro-template CLI", () => {
       error: {
         _tag: "ValidationFailed",
         message: "workspaceSlug must be a lowercase slug.",
+      },
+    });
+  });
+
+  it("parses capability args after the capability id", () => {
+    const result = runCli([
+      "capability",
+      "run",
+      "brain.pages.createMarkdown",
+      "--workspace",
+      "acme-demo",
+      "--input",
+      '{"title":"Slice check","markdown":"# Slice check"}',
+      "--idempotency-key",
+      "capability-slice-001",
+    ]);
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(1);
+    expect(payload).toMatchObject({
+      ok: false,
+      error: {
+        _tag: "FeatureDisabled",
+        message:
+          "Operation brain.pages.createMarkdown requires a runtime execution adapter.",
       },
     });
   });

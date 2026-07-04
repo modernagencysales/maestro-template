@@ -63,7 +63,8 @@ const operationsResult = ({
 const parseCapabilityRequest = (
   argv: readonly string[],
 ): CliCapabilityRequest | CliResult => {
-  const parsedArgs = parseNamedArgs(argv.slice(3));
+  const [, , , ...requestArgs] = argv;
+  const parsedArgs = parseNamedArgs(requestArgs);
   if (!parsedArgs.ok) {
     return cliFailure(`${parsedArgs.message}\n`);
   }
@@ -144,7 +145,8 @@ const integrationsResult = (
 };
 
 const workflowResult = ({ argv }: CliCommandContext): CliResult => {
-  const parsedArgs = parseNamedArgs(argv.slice(2));
+  const [, , ...workflowArgs] = argv;
+  const parsedArgs = parseNamedArgs(workflowArgs);
   if (!parsedArgs.ok) {
     return cliFailure(`${parsedArgs.message}\n`);
   }
