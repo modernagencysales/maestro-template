@@ -46,10 +46,11 @@ duplicated hand-written ProseMirror schema assumptions.
 
 `packages/convex/confect/http.ts` owns the current API surface. It serves the
 generated OpenAPI document at `/api/openapi.json`, the Scalar shell at
-`/api/docs`, and reviewer-safe executable `POST /api/<operation>` handlers from
-the same headless registry metadata. Production client apps should replace the
-deterministic template operation runner with generated Confect runner services
-without duplicating headless registry metadata.
+`/api/docs`, and executable `POST /api/<operation>` handlers from the generated
+Confect manifest. The generated refs are the client/server contract boundary:
+web, API, CLI, and MCP surfaces may project metadata, but business execution
+must dispatch through explicit generated ref mappings instead of duplicating
+operation logic.
 
 ## Convex Component Interop
 
@@ -67,7 +68,8 @@ without duplicating headless registry metadata.
 
 - Args, returns, and expected errors use Effect schemas.
 - No useful return means `Schema.Null`.
-- Expected failures use tagged errors and the Effect error channel.
+- Public expected failures are `Schema.TaggedError` classes and flow through the
+  Effect error channel.
 - Unexpected defects may die; they must not serialize private data.
 - Public-safe errors are separate from internal provider/config errors. Provider
   payloads, secret names, secret values, and stack traces are redacted before
@@ -106,8 +108,8 @@ telemetry needs a separate future durable event path.
 
 - Web uses `@confect/react` generated refs.
 - CLI and MCP use `@confect/js` generated refs.
-- HTTP APIs call generated runner services rather than duplicating business
-  logic.
+- HTTP APIs call generated Confect refs through the manifest executor rather
+  than duplicating business logic.
 - React adapters distinguish loading, empty, ready, skipped, typed failure,
   parse failure, transport failure, and defects.
 - Feature surfaces use shared Confect React adapters rather than hand-rolled raw
@@ -117,12 +119,13 @@ telemetry needs a separate future durable event path.
 
 ## Testing
 
-Use `@confect/test` for generated refs, auth identity, typed errors, HTTP
-routes, scheduled functions, storage, Node actions, and plain Convex interop in
-provisioned apps with Convex `_generated` codegen. The private template also
-keeps lightweight contract tests under `packages/convex/test` for generated ref
-metadata, Effect schema validation, public-safe typed errors, HTTP routes, and
-plain Convex registration shape without requiring a live Convex deployment.
+Use `@confect/test` for contract tests that exercise generated refs, auth
+identity, typed errors, HTTP routes, scheduled functions, storage, Node actions,
+and plain Convex interop in provisioned apps with Convex `_generated` codegen.
+The private template also keeps lightweight contract tests under
+`packages/convex/test` for generated ref metadata, Effect schema validation,
+public-safe typed errors, HTTP routes, and plain Convex registration shape
+without requiring a live Convex deployment.
 
 Run `check:confect-compat` after every Confect contract change. It must cover
 codegen, generated-file diffs, `@confect/test`, HTTP/Scalar fetch, React type
@@ -130,17 +133,18 @@ fixtures, and JavaScript client type fixtures.
 
 ## Generated Contract Manifest
 
-This migration plan introduces the target model where the generated Confect spec
-tree becomes the source of truth for API, CLI, MCP, OpenAPI, Scalar, workflow,
-and web-facing operation metadata. Today, the runtime headless projection still
-derives from the canned `templateRegistry` until later effectification tasks
-replace it with generated contract metadata.
+The generated Confect spec tree is the source of truth for API, CLI, MCP,
+OpenAPI, Scalar, workflow, and web-facing operation metadata. Manifest metadata
+comes from spec-bound builder helpers such as capability and workflow contract
+builders, is regenerated with `pnpm confect:manifest`, and is parity-checked
+against generated refs by the contract and headless-surface gates.
 
 Target rules:
 
 - Every public headless operation declares a typed public error schema.
 - Every headless operation declares allowed surfaces explicitly.
-- Surface exposure defaults to an empty set.
+- Public surfaces default to denied exposure: the builder default is an empty
+  external surface set unless a spec opts in.
 - Writes exposed over API, CLI, or MCP require an idempotency key argument.
 - Tenant identity is server-derived through a Principal and workspace access
   resolver, never trusted from caller-supplied workspace slug alone.

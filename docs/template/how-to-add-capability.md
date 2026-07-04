@@ -36,7 +36,8 @@ pnpm template:promote-capability -- --name summarizeSource --description "Summar
 The generator writes flat Confect capability drafts that match existing files
 such as `packages/convex/confect/capabilities/sourceGroundedBrief.spec.ts`.
 After review, add the promoted group to the Confect spec tree, run
-`pnpm confect:codegen`, then wire generated refs into web/API/CLI/MCP surfaces.
+`pnpm confect:codegen`, run `pnpm confect:manifest`, then wire generated refs
+into web/API/CLI/MCP surfaces only for explicitly exposed operations.
 
 Future generator slices should add frontend adapters when user-facing and richer
 fake fixtures once the capability owns provider side effects.
@@ -56,6 +57,8 @@ fake fixtures once the capability owns provider side effects.
 
 ## Gates
 
+- `pnpm confect:codegen`
+- `pnpm confect:manifest`
 - `pnpm --dir packages/convex test capabilities`
 - `pnpm check:confect-contracts`
 - `pnpm check:headless-surface-contract` when exposed.

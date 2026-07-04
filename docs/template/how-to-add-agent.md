@@ -20,6 +20,12 @@ Generated agent seats are web-facing by default with `surfaces: ["web"]`. They
 do not create API, CLI, MCP, `.headless.json`, or headless registry exposure
 until a separate headless contract review approves it.
 
+After writing an agent slice, run `pnpm confect:codegen`,
+`pnpm confect:manifest`, and the focused agent tests before wiring generated
+refs into the web surface. Keep API, CLI, and MCP denied unless a later headless
+exposure task adds typed public errors, idempotency posture, generated ref
+mappings, and surface tests.
+
 ## Tests
 
 - tool grant acceptance and refusal;
@@ -32,6 +38,8 @@ until a separate headless contract review approves it.
 
 ## Gates
 
+- `pnpm confect:codegen`
+- `pnpm confect:manifest`
 - `pnpm --dir packages/convex test agents`
 - `pnpm --dir apps/web test src/features/agents`
 - `pnpm check:headless-surface-contract` only after a separate headless exposure
