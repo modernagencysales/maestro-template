@@ -73,6 +73,13 @@ export namespace WorkflowGraphValidationError {
     },
   ) {}
 
+  export class DuplicateEdgeId extends S.TaggedError<DuplicateEdgeId>()(
+    "DuplicateEdgeId",
+    {
+      edgeId: S.String,
+    },
+  ) {}
+
   export class DanglingEdge extends S.TaggedError<DanglingEdge>()(
     "DanglingEdge",
     {
@@ -112,6 +119,7 @@ export namespace WorkflowGraphValidationError {
   export const Schema = S.Union(
     MissingStartNode,
     DuplicateNodeId,
+    DuplicateEdgeId,
     DanglingEdge,
     InvalidRetryConfig,
     InvalidDelayConfig,
@@ -130,6 +138,8 @@ export const validateWorkflowGraph = (
   const errors: WorkflowGraphValidationError[] = [];
   const nodeIds = new Set<string>();
   const duplicateNodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
+  const duplicateEdgeIds = new Set<string>();
 
   for (const node of graph.nodes) {
     if (nodeIds.has(node.id)) {
@@ -180,7 +190,14 @@ export const validateWorkflowGraph = (
     );
   }
 
+  const edgeKeys = new Set<string>();
   for (const edge of graph.edges) {
+    if (edgeIds.has(edge.id)) {
+      duplicateEdgeIds.add(edge.id);
+    }
+    edgeIds.add(edge.id);
+    edgeKeys.add(`${edge.sourceNodeId}\0${edge.targetNodeId}`);
+
     if (!nodeIds.has(edge.sourceNodeId)) {
       errors.push(
         new WorkflowGraphValidationError.DanglingEdge({
@@ -211,6 +228,10 @@ export const validateWorkflowGraph = (
     }
   }
 
+  for (const edgeId of duplicateEdgeIds) {
+    errors.push(new WorkflowGraphValidationError.DuplicateEdgeId({ edgeId }));
+  }
+
   for (const join of graph.joins) {
     if (!nodeIds.has(join.nodeId)) {
       errors.push(
@@ -227,6 +248,19 @@ export const validateWorkflowGraph = (
           new WorkflowGraphValidationError.InvalidJoin({
             nodeId: sourceNodeId,
             reason: "join source node is not in graph",
+          }),
+        );
+        continue;
+      }
+
+      if (
+        nodeIds.has(join.nodeId) &&
+        !edgeKeys.has(`${sourceNodeId}\0${join.nodeId}`)
+      ) {
+        errors.push(
+          new WorkflowGraphValidationError.InvalidJoin({
+            nodeId: join.nodeId,
+            reason: `join source node ${sourceNodeId} has no edge to join node`,
           }),
         );
       }

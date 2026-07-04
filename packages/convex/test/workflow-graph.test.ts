@@ -109,6 +109,26 @@ describe("workflow graph model", () => {
     );
   });
 
+  it("rejects duplicate edge identifiers", () => {
+    expect(
+      validateWorkflowGraph({
+        ...validGraph,
+        edges: [
+          ...validGraph.edges,
+          {
+            id: "edge_source_brief",
+            sourceNodeId: "source",
+            targetNodeId: "receipt",
+          },
+        ],
+      }),
+    ).toContainEqual(
+      new WorkflowGraphValidationError.DuplicateEdgeId({
+        edgeId: "edge_source_brief",
+      }),
+    );
+  });
+
   it("rejects invalid retry config", () => {
     expect(
       validateWorkflowGraph({
@@ -178,6 +198,26 @@ describe("workflow graph model", () => {
     ]);
   });
 
+  it("rejects joins whose sources are not connected to the join node", () => {
+    expect(
+      validateWorkflowGraph({
+        ...validGraph,
+        joins: [
+          {
+            nodeId: "receipt",
+            strategy: "all-successful",
+            sourceNodeIds: ["source"],
+          },
+        ],
+      }),
+    ).toContainEqual(
+      new WorkflowGraphValidationError.InvalidJoin({
+        nodeId: "receipt",
+        reason: "join source node source has no edge to join node",
+      }),
+    );
+  });
+
   it("rejects invalid condition expressions", () => {
     expect(
       validateWorkflowGraph({
@@ -190,6 +230,7 @@ describe("workflow graph model", () => {
             condition: { expression: "globalThis.process.exit()" },
           },
         ],
+        joins: [],
       }),
     ).toEqual([
       new WorkflowGraphValidationError.InvalidConditionExpression({

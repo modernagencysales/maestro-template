@@ -99,6 +99,7 @@ export const runDurableGraphWorkflow = async (
 
   const incomingByNode = groupEdgesByTarget(input.graph.edges);
   const outgoingByNode = groupEdgesBySource(input.graph.edges);
+  const reachableNodeIds = findReachableNodeIds(startNode.id, outgoingByNode);
   const joinsByNode = new Map(
     input.graph.joins.map((join) => [join.nodeId, join]),
   );
@@ -140,14 +141,20 @@ export const runDurableGraphWorkflow = async (
       stageKey: node.id,
       attemptNumber: 1,
       order,
-      run: () => executeNode(step, input, node, context),
+      run: async () => {
+        const result = await executeNode(step, input, node, context);
+        assertJsonSafe(
+          result,
+          `Workflow node ${node.id} returned non-JSON output.`,
+        );
+        if (node.kind === "output") {
+          assertJsonObject(result, "Workflow output must be a JSON object.");
+        }
+        return result;
+      },
     });
     order += 1;
 
-    assertJsonSafe(
-      result,
-      `Workflow node ${node.id} returned non-JSON output.`,
-    );
     context[node.id] = result;
     completedNodes.add(node.id);
 
@@ -182,6 +189,17 @@ export const runDurableGraphWorkflow = async (
         queue.push(target.id);
       }
     }
+  }
+
+  const blockedReachableNodeIds = [...reachableNodeIds].filter(
+    (nodeId) => !completedNodes.has(nodeId),
+  );
+  if (blockedReachableNodeIds.length > 0) {
+    throw makePublicError(
+      "VALIDATION_FAILED",
+      "Workflow graph traversal made no progress before completing reachable nodes.",
+      { nodeIds: blockedReachableNodeIds.join(",") },
+    );
   }
 
   assertJsonSafe(context, "Workflow context must be JSON-safe.");
@@ -382,6 +400,30 @@ const groupEdgesBySource = (
     ]);
   }
   return grouped;
+};
+
+const findReachableNodeIds = (
+  startNodeId: string,
+  outgoingByNode: ReadonlyMap<string, readonly WorkflowEdge[]>,
+): ReadonlySet<string> => {
+  const reachable = new Set<string>();
+  const queue = [startNodeId];
+
+  while (queue.length > 0) {
+    const nodeId = queue.shift();
+    if (!nodeId || reachable.has(nodeId)) {
+      continue;
+    }
+    reachable.add(nodeId);
+
+    for (const edge of outgoingByNode.get(nodeId) ?? []) {
+      if (!reachable.has(edge.targetNodeId)) {
+        queue.push(edge.targetNodeId);
+      }
+    }
+  }
+
+  return reachable;
 };
 
 const groupEdgesByTarget = (

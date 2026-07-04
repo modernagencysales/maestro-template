@@ -375,4 +375,175 @@ describe("durable graph runner", () => {
       message: "Agent node is not tagged as an agent seat: draftReply",
     });
   });
+
+  it("records non-JSON-safe node results as failed observed stages", async () => {
+    const mutationCalls: Array<{
+      readonly ref: DurableGraphStepRef<"mutation">;
+      readonly args: Record<string, unknown>;
+    }> = [];
+    const badResultGraph = {
+      id: "workflow_bad_result",
+      version: 1,
+      startNodeId: "source",
+      nodes: [
+        {
+          id: "source",
+          kind: "source",
+          label: "Source",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "bad",
+          kind: "capability",
+          label: "Bad Result",
+          capability: "badResult",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "output",
+          kind: "output",
+          label: "Output",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+      ],
+      edges: [
+        {
+          id: "source_bad",
+          sourceNodeId: "source",
+          targetNodeId: "bad",
+        },
+        {
+          id: "bad_output",
+          sourceNodeId: "bad",
+          targetNodeId: "output",
+        },
+      ],
+      joins: [],
+    } satisfies DurableWorkflowGraph;
+    const step: RunDurableGraphStep = {
+      runQuery: async () => undefined,
+      runAction: async () => null,
+      runMutation: async (ref, args) => {
+        mutationCalls.push({ ref, args });
+        return null;
+      },
+      sleep: async () => {},
+      awaitEvent: async <Result>() => ({}) as Result,
+    };
+
+    await expect(
+      runDurableGraphWorkflow(step, {
+        graph: badResultGraph,
+        inputs: { prompt: "hello" },
+        policySnapshot: { mode: "review" },
+        capabilityRegistry: {
+          badResult: {
+            kind: "query",
+            ref: classifyRef,
+          },
+        },
+        observability: {
+          workflowRunId: "run_bad_result",
+          componentWorkflowId: "workflow_component_bad_result",
+          recordStageStarted: stageStartedRef,
+          recordStageFinished: stageFinishedRef,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: "Workflow node bad returned non-JSON output.",
+    });
+
+    const badStageFinishes = mutationCalls.filter(
+      (call) => call.ref === stageFinishedRef && call.args.nodeId === "bad",
+    );
+    expect(badStageFinishes).toContainEqual(
+      expect.objectContaining({
+        args: expect.objectContaining({ status: "failed" }),
+      }),
+    );
+    expect(badStageFinishes).not.toContainEqual(
+      expect.objectContaining({
+        args: expect.objectContaining({ status: "succeeded" }),
+      }),
+    );
+  });
+
+  it("rejects reachable cycles that prevent traversal progress", async () => {
+    const cycleGraph = {
+      id: "workflow_cycle",
+      version: 1,
+      startNodeId: "source",
+      nodes: [
+        {
+          id: "source",
+          kind: "source",
+          label: "Source",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "cycle_a",
+          kind: "capability",
+          label: "Cycle A",
+          capability: "cycleA",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+        {
+          id: "cycle_b",
+          kind: "capability",
+          label: "Cycle B",
+          capability: "cycleB",
+          retry: { maxAttempts: 1, backoffMs: 0 },
+        },
+      ],
+      edges: [
+        {
+          id: "source_cycle_a",
+          sourceNodeId: "source",
+          targetNodeId: "cycle_a",
+        },
+        {
+          id: "cycle_a_cycle_b",
+          sourceNodeId: "cycle_a",
+          targetNodeId: "cycle_b",
+        },
+        {
+          id: "cycle_b_cycle_a",
+          sourceNodeId: "cycle_b",
+          targetNodeId: "cycle_a",
+        },
+      ],
+      joins: [],
+    } satisfies DurableWorkflowGraph;
+    const step: RunDurableGraphStep = {
+      runQuery: async () => ({ ok: true }),
+      runAction: async () => null,
+      runMutation: async () => null,
+      sleep: async () => {},
+      awaitEvent: async <Result>() => ({}) as Result,
+    };
+
+    await expect(
+      runDurableGraphWorkflow(step, {
+        graph: cycleGraph,
+        inputs: { prompt: "hello" },
+        policySnapshot: { mode: "review" },
+        capabilityRegistry: {
+          cycleA: {
+            kind: "query",
+            ref: classifyRef,
+          },
+          cycleB: {
+            kind: "query",
+            ref: classifyRef,
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      message:
+        "Workflow graph traversal made no progress before completing reachable nodes.",
+      details: { nodeIds: "cycle_a,cycle_b" },
+    });
+  });
 });
