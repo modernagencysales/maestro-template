@@ -21,7 +21,7 @@ type RenderedDocumentPage = Omit<DocumentPage, "diagram"> &
   Pick<NotionDocumentPageModel, "diagram" | "diagramLabel">;
 
 const pageById = new Map(pages.map((page) => [page.id, page]));
-const samplePageIdByRouteKey = new Map<string, string>([
+const routeKeyToPageId = new Map<string, string>([
   ["home", "overview"],
   ["brain", "brain"],
   ["workflows", "workflows"],
@@ -42,8 +42,8 @@ const samplePageIdByRouteKey = new Map<string, string>([
   ["health", "safety"],
   ["admin", "admin"],
 ]);
-const sampleRouteKeyByPageId = new Map(
-  [...samplePageIdByRouteKey.entries()].map(([key, value]) => [value, key]),
+const pageIdToRouteKey = new Map(
+  [...routeKeyToPageId.entries()].map(([key, value]) => [value, key]),
 );
 const sampleNavigation = TEMPLATE_NAV_CATEGORIES.map((category) => ({
   ...category,
@@ -51,46 +51,49 @@ const sampleNavigation = TEMPLATE_NAV_CATEGORIES.map((category) => ({
     key: item.key,
     label: item.key === "health" ? "Safety" : item.label,
     icon: item.icon,
-    href: `#${samplePageIdByRouteKey.get(item.key) ?? item.key}`,
+    href: `#${routeKeyToPageId.get(item.key) ?? item.key}`,
     ...(item.key === "api" ? { hint: "Scalar" } : {}),
   })),
 }));
-const samplePageIdFromHash = () => {
-  if (typeof window === "undefined") {
-    return navItems[0]?.id ?? "overview";
-  }
+const fallbackPageId = navItems[0]?.id ?? "overview";
+const pageIdFromHash = (hashValue: string) => {
+  const pageId = hashValue.replace(/^#/, "");
 
-  const hash = window.location.hash.replace(/^#/, "");
-
-  return pageById.has(hash) ? hash : (navItems[0]?.id ?? "overview");
-};
-
-const renderPage = (page: DocumentPage): RenderedDocumentPage => {
-  const { diagram, ...documentPage } = page;
-
-  if (!diagram) {
-    return documentPage;
-  }
-
-  return {
-    ...documentPage,
-    diagramLabel: diagram.label,
-    diagram: diagram.graph ? (
-      <WorkflowGraphCanvas graph={diagram.graph} />
-    ) : (
-      <WorkflowCanvas nodes={diagram.nodes ?? []} edges={diagram.edges ?? []} />
-    ),
-  };
+  return pageById.has(pageId) ? pageId : fallbackPageId;
 };
 
 export function App() {
-  const [activeNavId, setActiveNavId] = useState<string>(samplePageIdFromHash);
+  const [activeNavId, setActiveNavId] = useState<string>(() =>
+    typeof window === "undefined"
+      ? fallbackPageId
+      : pageIdFromHash(window.location.hash),
+  );
   const activePage = pageById.get(activeNavId) ?? overviewPage;
-  const activeRouteKey = sampleRouteKeyByPageId.get(activePage.id) ?? "home";
+  const activeRouteKey = pageIdToRouteKey.get(activePage.id) ?? "home";
+  const renderPage = (page: DocumentPage): RenderedDocumentPage => {
+    const { diagram, ...documentPage } = page;
+
+    if (!diagram) {
+      return documentPage;
+    }
+
+    return {
+      ...documentPage,
+      diagramLabel: diagram.label,
+      diagram: diagram.graph ? (
+        <WorkflowGraphCanvas graph={diagram.graph} />
+      ) : (
+        <WorkflowCanvas
+          nodes={diagram.nodes ?? []}
+          edges={diagram.edges ?? []}
+        />
+      ),
+    };
+  };
 
   useEffect(() => {
     const handleHashChange = () => {
-      setActiveNavId(samplePageIdFromHash());
+      setActiveNavId(pageIdFromHash(window.location.hash));
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -113,15 +116,12 @@ export function App() {
           activeKey={activeRouteKey}
           topbarTitle={activePage.title}
           onNavigate={(key) => {
-            const pageId = samplePageIdByRouteKey.get(key) ?? "overview";
+            const pageId = routeKeyToPageId.get(key) ?? "overview";
 
             setActiveNavId(pageId);
           }}
         >
           <NotionDocumentPage page={renderPage(activePage)} />
-          {/* Sibling of .notion-page on purpose: the visual baseline
-              screenshots the document element, and live data must never
-              shift a pinned screenshot. */}
           {activePage.id === "workflows" ? <LiveWorkflowRunsPanel /> : null}
         </TemplateWorkspaceShell>
       </TemplateToastProvider>
