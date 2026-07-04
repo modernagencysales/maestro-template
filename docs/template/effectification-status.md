@@ -36,8 +36,6 @@ contract family.
 
 ## Known Gaps Remaining
 
-- Phase G broad verification is not complete until Tasks 33-35 run the focused
-  phase gates, full `pnpm verify`, and final review checklist.
 - Some Confect groups still predate the spec-bound capability/workflow builder
   helpers. They are valid Confect groups, but they do not all emit manifest
   metadata until migrated.
@@ -76,16 +74,16 @@ inspect the generated diff, and prove no stale generated output remains.
 
 ## Phase Status
 
-| Phase | Scope                                                             | Status      |
-| ----- | ----------------------------------------------------------------- | ----------- |
-| 0     | Preflight API proofs and review-amendment guardrails              | complete    |
-| A     | Docs, baseline, executable Confect tests                          | complete    |
-| B     | Tenancy, typed errors, and Clock-backed persisted paths           | complete    |
-| C     | Capability builder, manifest, executor, and generated projections | complete    |
-| D     | Generators and semantic gates                                     | complete    |
-| E     | Effect services, frontend adapters, and runtime ergonomics        | complete    |
-| F     | Exact-pinned editor substrate                                     | complete    |
-| G     | Final docs, broad verification, and cleanup                       | in progress |
+| Phase | Scope                                                             | Status   |
+| ----- | ----------------------------------------------------------------- | -------- |
+| 0     | Preflight API proofs and review-amendment guardrails              | complete |
+| A     | Docs, baseline, executable Confect tests                          | complete |
+| B     | Tenancy, typed errors, and Clock-backed persisted paths           | complete |
+| C     | Capability builder, manifest, executor, and generated projections | complete |
+| D     | Generators and semantic gates                                     | complete |
+| E     | Effect services, frontend adapters, and runtime ergonomics        | complete |
+| F     | Exact-pinned editor substrate                                     | complete |
+| G     | Final docs, broad verification, and cleanup                       | complete |
 
 ## Verification Log
 
@@ -104,3 +102,5 @@ Add one row per completed phase or reconciliation gate.
 | 2026-07-04 | G / Task 32 | `rtk host-test-slot --class focused pnpm check:headless-surface-contract`              | pass                                                                                                                   |
 | 2026-07-04 | G / Task 32 | `rtk host-test-slot --class focused pnpm check:generators`                             | pass, pin-only                                                                                                         |
 | 2026-07-04 | G / Task 34 | `rtk host-test-slot --class full pnpm verify`                                          | pass                                                                                                                   |
+| 2026-07-04 | G / Task 35 | `rtk gh pr checks 6`                                                                   | pass, 9 hosted checks                                                                                                  |
+| 2026-07-04 | G / Task 35 | `rtk headless-bws-env exec bk build view -p mas/maestro-template 81 --no-pager --text` | pass: phase-1 deterministic gates, taste, and contract review                                                          |
