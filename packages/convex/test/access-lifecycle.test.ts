@@ -291,7 +291,6 @@ describe("workspace invitation lifecycle policy", () => {
     const blankEmailResult = declineInvitation({
       invitation: invitation({ email: "" }),
       verifiedEmail: " ",
-      userId: "users_decliner",
       now,
     });
     expect(Either.isLeft(blankEmailResult)).toBe(true);
@@ -368,7 +367,6 @@ describe("workspace invitation lifecycle policy", () => {
     const declineEither = declineInvitation({
       invitation: invitation({}),
       verifiedEmail: "ada@example.com",
-      userId: "users_decliner",
       now,
     });
     expect(Either.isRight(declineEither)).toBe(true);
@@ -378,33 +376,39 @@ describe("workspace invitation lifecycle policy", () => {
     });
 
     expect(
-      cancelInvitation({
-        invitation: invitation({ workspaceId: "workspaces_1" }),
-        workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        now,
-      }).invitationPatch,
+      Either.getOrThrow(
+        cancelInvitation({
+          invitation: invitation({ workspaceId: "workspaces_1" }),
+          workspaceId: "workspaces_1",
+          actorUserId: "users_owner",
+          now,
+        }),
+      ).invitationPatch,
     ).toEqual({
       id: "invitations_1",
       value: { status: "cancelled", revokedAt: now, updatedAt: now },
     });
 
     expect(
-      cancelInvitation({
-        invitation: invitation({ status: "accepted" }),
-        workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        now,
-      }).invitationPatch,
+      Either.getOrThrow(
+        cancelInvitation({
+          invitation: invitation({ status: "accepted" }),
+          workspaceId: "workspaces_1",
+          actorUserId: "users_owner",
+          now,
+        }),
+      ).invitationPatch,
     ).toBeNull();
 
     expect(
-      cancelInvitation({
-        invitation: invitation({ workspaceId: "workspaces_other" }),
-        workspaceId: "workspaces_1",
-        actorUserId: "users_owner",
-        now,
-      }).invitationPatch,
+      Either.getOrThrow(
+        cancelInvitation({
+          invitation: invitation({ workspaceId: "workspaces_other" }),
+          workspaceId: "workspaces_1",
+          actorUserId: "users_owner",
+          now,
+        }),
+      ).invitationPatch,
     ).toBeNull();
   });
 });
