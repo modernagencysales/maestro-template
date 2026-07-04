@@ -63,14 +63,14 @@ const pageIdFromHash = (hashValue: string) => {
 };
 
 export function App() {
-  const [activeNavId, setActiveNavId] = useState<string>(() =>
+  const [activePageId, setActivePageId] = useState<string>(() =>
     typeof window === "undefined"
       ? fallbackPageId
       : pageIdFromHash(window.location.hash),
   );
-  const activePage = pageById.get(activeNavId) ?? overviewPage;
+  const activePage = pageById.get(activePageId) ?? overviewPage;
   const activeRouteKey = pageIdToRouteKey.get(activePage.id) ?? "home";
-  const renderPage = (page: DocumentPage): RenderedDocumentPage => {
+  const toRenderedPage = (page: DocumentPage): RenderedDocumentPage => {
     const { diagram, ...documentPage } = page;
 
     if (!diagram) {
@@ -93,7 +93,7 @@ export function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setActiveNavId(pageIdFromHash(window.location.hash));
+      setActivePageId(pageIdFromHash(window.location.hash));
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -118,10 +118,10 @@ export function App() {
           onNavigate={(key) => {
             const pageId = routeKeyToPageId.get(key) ?? "overview";
 
-            setActiveNavId(pageId);
+            setActivePageId(pageId);
           }}
         >
-          <NotionDocumentPage page={renderPage(activePage)} />
+          <NotionDocumentPage page={toRenderedPage(activePage)} />
           {activePage.id === "workflows" ? <LiveWorkflowRunsPanel /> : null}
         </TemplateWorkspaceShell>
       </TemplateToastProvider>

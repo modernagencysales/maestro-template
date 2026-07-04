@@ -145,7 +145,7 @@ const integrationsResult = (
 };
 
 const workflowResult = ({ argv }: CliCommandContext): CliResult => {
-  const [, , ...workflowArgs] = argv;
+  const workflowArgs = argv.slice(2);
   const parsedArgs = parseNamedArgs(workflowArgs);
   if (!parsedArgs.ok) {
     return cliFailure(`${parsedArgs.message}\n`);
