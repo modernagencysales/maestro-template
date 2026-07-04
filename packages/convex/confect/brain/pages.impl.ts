@@ -68,11 +68,13 @@ const recordSnapshotInternal = FunctionImpl.make(
       const page = yield* reader
         .table("brainPages")
         .get(pageId)
-        .pipe(
-          Effect.mapError(
-            () => new NotFound({ resource: "brainPages", id: pageId }),
-          ),
+        .pipe(Effect.orDie);
+
+      if (page === null) {
+        return yield* Effect.fail(
+          new NotFound({ resource: "brainPages", id: pageId }),
         );
+      }
 
       if (page.workspaceId !== workspaceId) {
         return yield* Effect.fail(
