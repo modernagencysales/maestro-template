@@ -9,14 +9,10 @@ import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
 import { ValidationFailed } from "../errors";
+import { unsafeAssumeClockProvided } from "../shared/clock";
 import type { DsarRequestRowValue } from "../tables/dsarRequests";
 import dataLifecycleSpec from "./dataLifecycle.spec";
 import { buildWorkspaceDsarPlan } from "./dataLifecycle";
-
-const unsafeAssumeClockProvided = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
-  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
 
 const createDsarRequest = FunctionImpl.make(
   databaseSchema,

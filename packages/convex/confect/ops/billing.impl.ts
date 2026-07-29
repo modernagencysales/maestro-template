@@ -1,19 +1,14 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
+import { unsafeAssumeClockProvided } from "../shared/clock";
 import { validateCallerIdempotencyKey } from "../shared/idempotencyKey";
 import billing, { BillingError } from "./billing.spec";
 
-const now = 1_700_000_000_000;
-
-const unsafeAssumeClockProvided = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
-  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
+const fixedTimestampMs = 1_700_000_000_000;
 
 const recordUsage = FunctionImpl.make(
   databaseSchema,
@@ -38,7 +33,7 @@ const recordUsage = FunctionImpl.make(
 
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
-      const existingUsage = yield* exactlyOneOrDie(
+      const existingUsage = yield* atMostOneOrDie(
         "billing usage idempotency key",
         yield* reader
           .table("usageEvents")
@@ -64,7 +59,7 @@ const recordUsage = FunctionImpl.make(
           );
         }
 
-        const existingLedger = yield* exactlyOneOrDie(
+        const existingLedger = yield* atMostOneOrDie(
           "billing ledger idempotency key",
           yield* reader
             .table("creditLedger")
@@ -86,7 +81,7 @@ const recordUsage = FunctionImpl.make(
         return usageReturn(existingUsage, existingLedger._id);
       }
 
-      const entitlement = yield* exactlyOneOrDie(
+      const entitlement = yield* atMostOneOrDie(
         "billing entitlement key",
         yield* reader
           .table("entitlements")
@@ -127,7 +122,7 @@ const recordUsage = FunctionImpl.make(
           units: input.units,
           costCredits: input.costCredits,
           entitlementKey: input.entitlementKey,
-          createdAt: now,
+          createdAt: fixedTimestampMs,
         })
         .pipe(Effect.orDie);
       const ledgerEntryId = yield* writer
@@ -139,7 +134,7 @@ const recordUsage = FunctionImpl.make(
           reason: "llm_usage" as const,
           idempotencyKey: idempotencyKey.value,
           appendOnly: true as const,
-          createdAt: now,
+          createdAt: fixedTimestampMs,
           createdBy: "system:billing",
         })
         .pipe(Effect.orDie);
@@ -148,7 +143,7 @@ const recordUsage = FunctionImpl.make(
         .table("entitlements")
         .patch(entitlement._id, {
           used: entitlement.used + input.costCredits,
-          updatedAt: now,
+          updatedAt: fixedTimestampMs,
         })
         .pipe(Effect.orDie);
 
@@ -162,12 +157,12 @@ const recordUsage = FunctionImpl.make(
         costCredits: input.costCredits,
         entitlementKey: input.entitlementKey,
         appendOnly: true as const,
-        createdAt: now,
+        createdAt: fixedTimestampMs,
       };
     }),
 );
 
-const exactlyOneOrDie = <A>(
+const atMostOneOrDie = <A>(
   description: string,
   rows: readonly A[],
 ): Effect.Effect<A | null, never> => {
@@ -249,7 +244,7 @@ const applyWebhook = FunctionImpl.make(
 
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
-      const existingWebhook = yield* exactlyOneOrDie(
+      const existingWebhook = yield* atMostOneOrDie(
         "billing webhook dedupe key",
         yield* reader
           .table("webhookEvents")
@@ -287,7 +282,7 @@ const applyWebhook = FunctionImpl.make(
           signatureTimestamp: input.signatureTimestamp,
           dedupeKey: dedupeKey.value,
           status: "processed" as const,
-          createdAt: now,
+          createdAt: fixedTimestampMs,
         })
         .pipe(Effect.orDie);
 
@@ -299,7 +294,7 @@ const applyWebhook = FunctionImpl.make(
         signatureTimestamp: input.signatureTimestamp,
         dedupeKey: dedupeKey.value,
         status: "processed" as const,
-        createdAt: now,
+        createdAt: fixedTimestampMs,
       };
     }),
 );
@@ -363,7 +358,9 @@ const webhookReturn = (
   createdAt: webhook.createdAt,
 });
 
-const grantEntitlement = FunctionImpl.make(
+// This is the deterministic fake/local implementation of the public contract.
+// Forks replace it with an authorized, idempotent persistence boundary.
+const grantEntitlementFixture = FunctionImpl.make(
   databaseSchema,
   billing,
   "grantEntitlement",
@@ -376,7 +373,7 @@ const grantEntitlement = FunctionImpl.make(
       used: 0,
       source: input.source,
       status: "active" as const,
-      createdAt: now,
+      createdAt: fixedTimestampMs,
     }),
 );
 
@@ -397,7 +394,7 @@ const checkSeat = FunctionImpl.make(
 export default GroupImpl.make(databaseSchema, billing).pipe(
   Layer.provide(recordUsage),
   Layer.provide(applyWebhook),
-  Layer.provide(grantEntitlement),
+  Layer.provide(grantEntitlementFixture),
   Layer.provide(checkSeat),
   GroupImpl.finalize,
 );

@@ -66,6 +66,24 @@ describe("check:provider-boundary", () => {
     );
   });
 
+  it("rejects the WorkOS server SDK (@workos-inc scope) in product code", async () => {
+    const result = await evaluateFixture({
+      "packages/template-core/src/bad.ts": `
+        import { WorkOS } from "@workos-inc/node";
+
+        export const provider = WorkOS;
+      `,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        file: "packages/template-core/src/bad.ts",
+        module: "@workos-inc/node",
+      }),
+    );
+  });
+
   it("detects provider re-exports and require calls", async () => {
     const result = await evaluateFixture({
       "packages/workflow-ui/src/bad.ts": `
