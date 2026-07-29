@@ -7,13 +7,8 @@ import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
 import { NotFound, ValidationFailed } from "../errors";
 import { withMutationErrorCapture } from "../observability/errorCapture";
+import { unsafeAssumeClockProvided } from "../shared/clock";
 import pages from "./pages.spec";
-
-const unsafeAssumeClockProvided = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
-  // Confect provides Clock at runtime, but its current handler type omits it.
-  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
 
 const list = FunctionImpl.make(
   databaseSchema,

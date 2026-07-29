@@ -38,7 +38,7 @@ const providerModulePatterns = [
   /^@cloudflare(?:\/|$)/,
   /^@posthog(?:\/|$)/,
   /^@sentry(?:\/|$)/,
-  /^@workos(?:\/|$)/,
+  /^@workos(?:-|\/|$)/,
   /^ai$/,
   /^cloudflare(?:\/|$)/,
   /^dodo(?:\/|$)/,

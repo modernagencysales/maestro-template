@@ -1,19 +1,14 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
+import { unsafeAssumeClockProvided } from "../shared/clock";
 import { validateCallerIdempotencyKey } from "../shared/idempotencyKey";
 import billing, { BillingError } from "./billing.spec";
 
-const now = 1_700_000_000_000;
-
-const unsafeAssumeClockProvided = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
-  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
+const fixedTimestampMs = 1_700_000_000_000;
 
 const recordUsage = FunctionImpl.make(
   databaseSchema,
@@ -127,7 +122,7 @@ const recordUsage = FunctionImpl.make(
           units: input.units,
           costCredits: input.costCredits,
           entitlementKey: input.entitlementKey,
-          createdAt: now,
+          createdAt: fixedTimestampMs,
         })
         .pipe(Effect.orDie);
       const ledgerEntryId = yield* writer
@@ -139,7 +134,7 @@ const recordUsage = FunctionImpl.make(
           reason: "llm_usage" as const,
           idempotencyKey: idempotencyKey.value,
           appendOnly: true as const,
-          createdAt: now,
+          createdAt: fixedTimestampMs,
           createdBy: "system:billing",
         })
         .pipe(Effect.orDie);
@@ -148,7 +143,7 @@ const recordUsage = FunctionImpl.make(
         .table("entitlements")
         .patch(entitlement._id, {
           used: entitlement.used + input.costCredits,
-          updatedAt: now,
+          updatedAt: fixedTimestampMs,
         })
         .pipe(Effect.orDie);
 
@@ -162,7 +157,7 @@ const recordUsage = FunctionImpl.make(
         costCredits: input.costCredits,
         entitlementKey: input.entitlementKey,
         appendOnly: true as const,
-        createdAt: now,
+        createdAt: fixedTimestampMs,
       };
     }),
 );
@@ -287,7 +282,7 @@ const applyWebhook = FunctionImpl.make(
           signatureTimestamp: input.signatureTimestamp,
           dedupeKey: dedupeKey.value,
           status: "processed" as const,
-          createdAt: now,
+          createdAt: fixedTimestampMs,
         })
         .pipe(Effect.orDie);
 
@@ -299,7 +294,7 @@ const applyWebhook = FunctionImpl.make(
         signatureTimestamp: input.signatureTimestamp,
         dedupeKey: dedupeKey.value,
         status: "processed" as const,
-        createdAt: now,
+        createdAt: fixedTimestampMs,
       };
     }),
 );
@@ -376,7 +371,7 @@ const grantEntitlement = FunctionImpl.make(
       used: 0,
       source: input.source,
       status: "active" as const,
-      createdAt: now,
+      createdAt: fixedTimestampMs,
     }),
 );
 

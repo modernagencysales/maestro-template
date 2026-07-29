@@ -9,6 +9,7 @@ import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
 import { Forbidden, NotFound, ValidationFailed } from "../errors";
+import { unsafeAssumeClockProvided } from "../shared/clock";
 import { validateCallerIdempotencyKey } from "../shared/idempotencyKey";
 import notifications from "./notifications.spec";
 
@@ -22,11 +23,6 @@ const notificationCategories = [
   "security",
   "system",
 ] as const;
-
-const unsafeAssumeClockProvided = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
-  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
 
 const list = FunctionImpl.make(
   databaseSchema,

@@ -10,6 +10,7 @@ import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import { roleAtLeast, type Role } from "../access/roles";
 import { requireWorkspaceAccess } from "../capabilities/_kit/workspaceAccess";
 import { ValidationFailed } from "../errors";
+import { unsafeAssumeClockProvided } from "../shared/clock";
 import flags from "./flags.spec";
 
 const defaultFeatureFlagPolicies = [
@@ -52,11 +53,6 @@ const defaultFeatureFlagPolicies = [
     killSwitchEnv: "LLM_DISABLED",
   },
 ] as const satisfies readonly FeatureFlagPolicySeed[];
-
-const unsafeAssumeClockProvided = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R, Clock.Clock>> =>
-  effect as Effect.Effect<A, E, Exclude<R, Clock.Clock>>;
 
 const list = FunctionImpl.make(
   databaseSchema,
