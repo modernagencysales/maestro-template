@@ -33,7 +33,7 @@ const recordUsage = FunctionImpl.make(
 
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
-      const existingUsage = yield* exactlyOneOrDie(
+      const existingUsage = yield* atMostOneOrDie(
         "billing usage idempotency key",
         yield* reader
           .table("usageEvents")
@@ -59,7 +59,7 @@ const recordUsage = FunctionImpl.make(
           );
         }
 
-        const existingLedger = yield* exactlyOneOrDie(
+        const existingLedger = yield* atMostOneOrDie(
           "billing ledger idempotency key",
           yield* reader
             .table("creditLedger")
@@ -81,7 +81,7 @@ const recordUsage = FunctionImpl.make(
         return usageReturn(existingUsage, existingLedger._id);
       }
 
-      const entitlement = yield* exactlyOneOrDie(
+      const entitlement = yield* atMostOneOrDie(
         "billing entitlement key",
         yield* reader
           .table("entitlements")
@@ -162,7 +162,7 @@ const recordUsage = FunctionImpl.make(
     }),
 );
 
-const exactlyOneOrDie = <A>(
+const atMostOneOrDie = <A>(
   description: string,
   rows: readonly A[],
 ): Effect.Effect<A | null, never> => {
@@ -244,7 +244,7 @@ const applyWebhook = FunctionImpl.make(
 
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
-      const existingWebhook = yield* exactlyOneOrDie(
+      const existingWebhook = yield* atMostOneOrDie(
         "billing webhook dedupe key",
         yield* reader
           .table("webhookEvents")
@@ -358,7 +358,9 @@ const webhookReturn = (
   createdAt: webhook.createdAt,
 });
 
-const grantEntitlement = FunctionImpl.make(
+// This is the deterministic fake/local implementation of the public contract.
+// Forks replace it with an authorized, idempotent persistence boundary.
+const grantEntitlementFixture = FunctionImpl.make(
   databaseSchema,
   billing,
   "grantEntitlement",
@@ -392,7 +394,7 @@ const checkSeat = FunctionImpl.make(
 export default GroupImpl.make(databaseSchema, billing).pipe(
   Layer.provide(recordUsage),
   Layer.provide(applyWebhook),
-  Layer.provide(grantEntitlement),
+  Layer.provide(grantEntitlementFixture),
   Layer.provide(checkSeat),
   GroupImpl.finalize,
 );
